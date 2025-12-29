@@ -1,0 +1,431 @@
+{% extends 'queue_app/base.html' %}
+
+{% block content %}
+    <!-- Stats Row -->
+    <div class="row mb-4">
+        <!-- Total Today -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <a href="?status=total" class="text-decoration-none">
+                <div class="card bg-primary text-white shadow h-100 py-2" style="transition: transform 0.2s; cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-uppercase mb-1" style="opacity: 0.8;">คิวทั้งหมด</div>
+                                <div class="h1 mb-0 font-weight-bold">{{ total_today }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-list fa-2x text-white-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Waiting -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <a href="?status=waiting" class="text-decoration-none">
+                <div class="card bg-warning text-white shadow h-100 py-2" style="transition: transform 0.2s; cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-uppercase mb-1" style="opacity: 0.8;">รอรับบริการ (Waiting)</div>
+                                <div class="h1 mb-0 font-weight-bold">{{ waiting_count }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-clock fa-2x text-white-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Active -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <a href="?status=active" class="text-decoration-none">
+                <div class="card bg-info text-white shadow h-100 py-2" style="transition: transform 0.2s; cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-uppercase mb-1" style="opacity: 0.8;">กำลังดำเนินการ (Active)</div>
+                                <div class="h1 mb-0 font-weight-bold">{{ active_count }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-cog fa-spin fa-2x text-white-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Done -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <a href="?status=done" class="text-decoration-none">
+                <div class="card bg-success text-white shadow h-100 py-2" style="transition: transform 0.2s; cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-uppercase mb-1" style="opacity: 0.8;">เสร็จสิ้น (Done)</div>
+                                <div class="h1 mb-0 font-weight-bold">{{ done_count }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-check-circle fa-2x text-white-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Current Queue & Status -->
+    <div class="row">
+        <div class="col-lg-12 mb-4">
+            <div class="card current-queue-card shadow mb-4 border-left-info">
+                <div class="card-header py-3 bg-white border-0">
+                    <h5 class="m-0 font-weight-bold text-primary"><i class="fas fa-bullhorn mr-2"></i> กำลังเรียกคิว</h5>
+                </div>
+                <div class="card-body text-center py-5">
+                    <p class="mb-2 text-gray-500">หมายเลขคิวปัจจุบัน</p>
+                    
+                    {% if current_queue %}
+                        <div class="queue-number-large text-primary">{{ current_queue.queue_number }}</div>
+                        <h2 class="font-weight-bold text-gray-800">{{ current_queue.user_name }}</h2>
+                        <p class="text-muted mb-2">{{ current_queue.user_department }} - <span data-toggle="tooltip" data-placement="top" data-html="true" title="{{ current_queue.issue_description|linebreaksbr }}">{{ current_queue.issue_description|truncatechars:50 }}</span></p>
+                        <div class="mb-4">
+                            <span class="badge badge-info badge-pill px-4 py-2" style="font-size: 1.2rem;">กำลังดำเนินการ</span>
+                            <button class="btn btn-sm {% if current_queue.comment %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
+                                    onclick="openDescModal('{{ current_queue.id }}', '{% if current_queue.comment %}{{ current_queue.comment|escapejs }}{% endif %}')"
+                                    title="บันทึกหมายเหตุ" style="width: 32px; height: 32px;">
+                               {% if current_queue.comment %}
+                                 <i class="fas fa-comment-dots"></i>
+                               {% else %}
+                                 <i class="fas fa-plus"></i>
+                               {% endif %}
+                            </button>
+                        </div>
+                    {% else %}
+                        <div class="queue-number-large text-gray-300">-</div>
+                        <h2 class="font-weight-bold text-gray-500">ว่าง</h2>
+                        <p class="text-muted">รอเรียกคิวถัดไป</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Next Queues List -->
+    <div class="row" id="queue-list-section">
+        <div class="col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
+                    <h5 class="m-0 font-weight-bold text-dark"><i class="fas fa-list-ol mr-2"></i> {{ list_title }}</h5>
+                    <div class="d-flex align-items-center">
+                        <form class="form-inline mr-2" method="GET" action="#queue-list-section">
+                            {% if active_filter %}
+                            <input type="hidden" name="status" value="{{ active_filter }}">
+                            {% endif %}
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-light border-0 small" placeholder="ค้นหา..."
+                                    aria-label="Search" aria-describedby="basic-addon2" name="q" value="{{ search_query }}">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary" type="submit">
+                                        <i class="fas fa-search fa-sm"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                        <a href="?status={{ active_filter }}#queue-list-section" class="btn btn-outline-primary" style="border-radius: 5px; padding: 6px 15px;">
+                            <i class="fas fa-sync-alt mr-1"></i> Refresh
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-striped mb-0">
+                        <thead class="bg-gray-200 text-gray-800">
+                            <tr>
+                                <th class="py-3">คิวที่</th>
+                                <th class="py-3">ผู้แจ้ง</th>
+                                <th class="py-3">สาขา</th>
+                                <th class="py-3">ปัญหา</th>
+                                <th class="py-3 text-center">เพิ่มเติม</th>
+                                <th class="py-3">เวลา</th>
+                                <th class="py-3">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in queue_list %}
+                            <tr>
+                                <td class="font-weight-bold text-primary">{{ item.queue_number }}</td>
+                                <td>
+                                    <div class="font-weight-bold text-gray-800">{{ item.user_name }}</div>
+                                </td>
+                                <td>{{ item.user_department }}</td>
+                                <td data-toggle="tooltip" data-placement="top" data-html="true" title="{{ item.issue_description|linebreaksbr }}">{{ item.issue_description|truncatechars:60 }}</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm {% if item.comment %}btn-info{% else %}btn-outline-secondary{% endif %} desc-btn" 
+                                            onclick="openDescModal('{{ item.id }}', '{% if item.comment %}{{ item.comment|escapejs }}{% endif %}')"
+                                            title="บันทึกหมายเหตุ">
+                                       {% if item.comment %}
+                                         <i class="fas fa-comment-dots"></i>
+                                       {% else %}
+                                         <i class="fas fa-plus"></i>
+                                       {% endif %}
+                                    </button>
+                                </td>
+                                <td>{{ item.created_at|date:"d/m H:i" }}</td>
+                                <td>
+                                    {% if item.status.code == 'WAITING' %}
+                                    <span class="badge badge-warning">{{ item.status.name }}</span>
+                                    {% elif item.status.code == 'ACTIVE' %}
+                                    <span class="badge badge-info">{{ item.status.name }}</span>
+                                    {% elif item.status.code == 'DONE' %}
+                                    <span class="badge badge-success">{{ item.status.name }}</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary">{{ item.status.name|default:"-" }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-gray-500">
+                                    ไม่พบข้อมูลในรายการนี้
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if queue_list.has_other_pages %}
+                <div class="card-footer bg-white py-3">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if queue_list.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ queue_list.previous_page_number }}&status={{ active_filter }}&q={{ search_query }}#queue-list-section" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#queue-list-section" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for i in queue_list.paginator.page_range %}
+                                {% if queue_list.number == i %}
+                                <li class="page-item active"><a class="page-link" href="#queue-list-section">{{ i }}</a></li>
+                                {% else %}
+                                <li class="page-item"><a class="page-link" href="?page={{ i }}&status={{ active_filter }}&q={{ search_query }}#queue-list-section">{{ i }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if queue_list.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ queue_list.next_page_number }}&status={{ active_filter }}&q={{ search_query }}#queue-list-section" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#queue-list-section" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Description Modal -->
+    <div class="modal fade" id="descModal" tabindex="-1" role="dialog" aria-labelledby="descModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="descModalLabel">รายละเอียดเพิ่มเติม</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="modal-job-id">
+            <div class="form-group">
+                <label for="modal-desc-text">หมายเหตุ / Comment:</label>
+                <textarea class="form-control" id="modal-desc-text" rows="5"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">ปิด</button>
+            <button type="button" class="btn btn-primary" onclick="saveDescription()">บันทึก</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Floating Action Button -->
+    <div id="admin-fab-container" class="d-flex flex-column align-items-end" style="position: fixed; bottom: 30px; right: 30px; z-index: 1000;">
+        <!-- Menu Items -->
+        <div id="admin-menu" class="bg-white shadow-lg rounded-lg mb-3" style="width: 250px; border-radius: 12px; border: 1px solid #e3e6f0; display: none; transform-origin: bottom right;">
+            <div class="p-3">
+                <div class="mb-3 text-gray-500 font-weight-bold" style="font-size: 0.9rem;">Admin Tools</div>
+                
+                <a href="{% url 'call_next' %}" id="call-next-btn" class="d-flex align-items-center text-dark text-decoration-none mb-3 admin-menu-item" data-active-count="{{ active_count }}">
+                    <div class="mr-3 text-warning font-weight-bold"><i class="fas fa-bullhorn"></i></div>
+                    <div>เรียกคิวถัดไป</div>
+                </a>
+                
+                <a href="{% url 'finish_queue' %}" class="d-flex align-items-center text-dark text-decoration-none admin-menu-item">
+                    <div class="mr-3 text-primary font-weight-bold"><i class="fas fa-check"></i></div>
+                    <div>จบงานปัจจุบัน</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- FAB Button -->
+        <button id="admin-fab" class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 1.5rem; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);" onclick="toggleAdminMenu()">
+            <i class="fas fa-tools" id="admin-fab-icon"></i>
+        </button>
+    </div>
+
+    <style>
+        .admin-menu-item {
+            transition: all 0.2s ease;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        .admin-menu-item:hover {
+            background-color: #f8f9fc;
+            transform: translateX(5px);
+        }
+        
+        /* Pulse Animation */
+        @keyframes pulse-blue {
+            0% {
+                box-shadow: 0 0 0 0 rgba(78, 115, 223, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(78, 115, 223, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(78, 115, 223, 0);
+            }
+        }
+        
+        #admin-fab {
+            animation: pulse-blue 2s infinite;
+        }
+        #admin-fab:hover {
+            animation: none;
+            transform: scale(1.1);
+        }
+        
+        #admin-fab.active {
+            transform: rotate(45deg);
+            background-color: #e74a3b; /* Red color when active */
+            border-color: #e74a3b;
+        }
+    </style>
+
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        function toggleAdminMenu() {
+            $('#admin-menu').slideToggle('fast');
+            $('#admin-fab').toggleClass('active');
+            
+            // Rotate icon and change color
+            if ($('#admin-fab').hasClass('active')) {
+                 $('#admin-fab i').removeClass('fa-tools').addClass('fa-times').css('transform', 'rotate(90deg)');
+                 $('#admin-fab').removeClass('btn-primary').addClass('btn-danger');
+            } else {
+                 $('#admin-fab i').removeClass('fa-times').addClass('fa-tools').css('transform', 'rotate(0deg)');
+                 $('#admin-fab').removeClass('btn-danger').addClass('btn-primary');
+            }
+        }
+        
+        // Intercept Call Next Button
+        document.getElementById('call-next-btn').addEventListener('click', function(e) {
+            var activeCount = parseInt(this.getAttribute('data-active-count'));
+            
+            if (activeCount > 0) {
+                e.preventDefault();
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'ไม่สามารถเรียกคิวถัดไปได้',
+                    text: 'มีรายการที่กำลังดำเนินการอยู่ กรุณากด "จบงานปัจจุบัน" ก่อน',
+                    confirmButtonText: 'เข้าใจแล้ว',
+                    confirmButtonColor: '#f6c23e'
+                });
+            }
+        });
+        
+        // Modal logic
+        function openDescModal(id, desc) {
+            $('#modal-job-id').val(id);
+            $('#modal-desc-text').val(desc);
+            $('#descModal').modal('show');
+        }
+
+        function saveDescription() {
+            var id = $('#modal-job-id').val();
+            var comment = $('#modal-desc-text').val();
+            
+            $.ajax({
+                url: '{% url "update_job_desc" %}',
+                type: 'POST',
+                data: JSON.stringify({id: id, comment: comment}),
+                contentType: 'application/json',
+                success: function(response) {
+                    if(response.success) {
+                        $('#descModal').modal('hide');
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'บันทึกสำเร็จ',
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                         Swal.fire({
+                            icon: 'error',
+                            title: 'เกิดข้อผิดพลาด',
+                            text: response.error
+                        });
+                    }
+                },
+                error: function() {
+                     Swal.fire({
+                            icon: 'error',
+                            title: 'เกิดข้อผิดพลาดในการเชื่อมต่อ',
+                        });
+                }
+            });
+        }
+        
+        // Close menu when clicking outside
+        $(document).click(function(event) { 
+            var $target = $(event.target);
+            if(!$target.closest('#admin-fab-container').length && 
+               $('#admin-menu').is(":visible")) {
+                toggleAdminMenu();
+            }        
+        });
+        
+        // Initialize Tooltips
+        $(function () {
+          $('[data-toggle="tooltip"]').tooltip({
+              html: true
+          })
+        })
+    </script>
+{% endblock %}
