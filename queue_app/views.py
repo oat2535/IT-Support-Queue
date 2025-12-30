@@ -57,7 +57,7 @@ def dashboard(request):
         )
 
     # Pagination Logic
-    paginator = Paginator(queue_list, 10) # 10 items
+    paginator = Paginator(queue_list, 5) # 5 items per page
     page = request.GET.get('page')
     try:
         queue_list = paginator.page(page)

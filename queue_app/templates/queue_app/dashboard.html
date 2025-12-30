@@ -167,7 +167,7 @@
                                 <td class="text-center">
                                     <button class="btn btn-sm {% if item.comment %}btn-info{% else %}btn-outline-secondary{% endif %} desc-btn" 
                                             onclick="openDescModal('{{ item.id }}', '{% if item.comment %}{{ item.comment|escapejs }}{% endif %}')"
-                                            title="บันทึกหมายเหตุ">
+                                            title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true">
                                        {% if item.comment %}
                                          <i class="fas fa-comment-dots"></i>
                                        {% else %}
