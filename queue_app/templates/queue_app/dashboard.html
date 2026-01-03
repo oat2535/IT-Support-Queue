@@ -427,5 +427,13 @@
               html: true
           })
         })
+
+        // Auto Refresh every 1 minute (60,000 ms)
+        // Only refresh if no modal is open to avoid interrupting user input
+        setInterval(function() {
+            if (!$('.modal').hasClass('show')) {
+                window.location.reload();
+            }
+        }, 60000);
     </script>
 {% endblock %}
