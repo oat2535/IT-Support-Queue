@@ -1,4 +1,5 @@
 import pyodbc
+import os
 from .models import JobsBms
 from datetime import datetime
 
@@ -8,10 +9,10 @@ def sync_jobs_from_mssql():
     คืนค่าจำนวนรายการที่ sync ไปได้
     """
     # รายละเอียดการเชื่อมต่อ MSSQL
-    server = '192.168.99.224' 
-    database = 'BMSDB' 
-    username = 'kanchana_a' 
-    password = 'Bms@2025' 
+    server = os.environ.get('MSSQL_SERVER', '192.168.99.224')
+    database = os.environ.get('MSSQL_DATABASE', 'BMSDB')
+    username = os.environ.get('MSSQL_USER', 'kanchana_a')
+    password = os.environ.get('MSSQL_PASSWORD', 'Bms@2025') 
     
     drivers = [driver for driver in pyodbc.drivers() if 'SQL Server' in driver]
     if not drivers:
