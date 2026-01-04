@@ -11,8 +11,6 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-import os
-import dj_database_url
 
 # สร้าง path ภายในโปรเจค เช่น: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,13 +20,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # คำเตือนความปลอดภัย: เก็บ secret key นี้ไว้เป็นความลับในการใช้งานจริง!
-# คำเตือนความปลอดภัย: เก็บ secret key นี้ไว้เป็นความลับในการใช้งานจริง!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-9pu5zuv&jatunkihcs_si=^^1(k#_yg=a4(v%l#2^3h%_%15=v')
+SECRET_KEY = 'django-insecure-9pu5zuv&jatunkihcs_si=^^1(k#_yg=a4(v%l#2^3h%_%15=v'
 
 # คำเตือนความปลอดภัย: อย่าเปิด debug mode ในการใช้งานจริง (Production)!
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+DEBUG = True
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = ['*']
 
 
 # การกำหนด Application ในระบบ
@@ -45,7 +42,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -79,10 +75,17 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', 'postgresql://eservices:Tlp@2023@192.168.98.254:5434/imedx_tlp_for_it'),
-        conn_max_age=600
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'imedx_tlp_for_it',
+        'USER': 'eservices',
+        'PASSWORD': 'Tlp@2023',
+        'HOST': '192.168.98.254',
+        'PORT': '5434',
+        'OPTIONS': {
+            'options': '-c search_path=intra_tl'
+        }
+    }
 }
 
 
@@ -124,8 +127,6 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / "startbootstrap-sb-admin-2-gh-pages",
 ]
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # สำหรับ HTTPS
 CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com']
