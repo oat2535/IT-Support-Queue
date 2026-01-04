@@ -1,5 +1,6 @@
 import pyodbc
 from .models import JobsBms
+from datetime import datetime
 
 def sync_jobs_from_mssql():
     """
@@ -135,7 +136,7 @@ def sync_jobs_from_mssql():
             )
             count += 1
             
-        print(f"Synced {count} jobs from MSSQL.")
+        print(f"[{datetime.now().strftime('%d/%b/%Y %H:%M:%S')}] Synced {count} jobs from MSSQL.")
         
         # Now sync to QueueItem
         sync_to_queue_items()

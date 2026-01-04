@@ -12,8 +12,7 @@ import random
 
 def dashboard(request):
     # We rely on the management command to sync data now.
-    # sync_jobs_from_mssql() # Calling this updates JobsBms AND QueueItem via the new logic
-    sync_jobs_from_mssql()
+    # sync_jobs_from_mssql() is removed from here to improve performance
     
     # query QueueItem instead of JobsBms
     items = QueueItem.objects.all()
