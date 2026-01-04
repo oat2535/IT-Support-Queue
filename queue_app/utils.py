@@ -4,10 +4,10 @@ from datetime import datetime
 
 def sync_jobs_from_mssql():
     """
-    Connects to MSSQL and syncs jobs matching the criteria.
-    Returns the number of jobs synced.
+    เชื่อมต่อฐานข้อมูล MSSQL และดึงข้อมูลงานซ่อม (Sync Jobs) ตามเงื่อนไข
+    คืนค่าจำนวนรายการที่ sync ไปได้
     """
-    # MSSQL Connection details
+    # รายละเอียดการเชื่อมต่อ MSSQL
     server = '192.168.99.224' 
     database = 'BMSDB' 
     username = 'kanchana_a' 
@@ -19,7 +19,7 @@ def sync_jobs_from_mssql():
         return 0
     driver = drivers[0]
     
-    conn_str = f'DRIVER={{{driver}}};SERVER={server};DATABASE={database};UID={username};PWD={password}'
+    conn_str = f'DRIVER={{{driver}}};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes'
     
     count = 0
     try:
@@ -138,7 +138,7 @@ def sync_jobs_from_mssql():
             
         print(f"[{datetime.now().strftime('%d/%b/%Y %H:%M:%S')}] Synced {count} jobs from MSSQL.")
         
-        # Now sync to QueueItem
+        # หลังจาก Sync Job เสร็จ ให้เอา Job ไปสร้างเป็น QueueItem ต่อทันที
         sync_to_queue_items()
             
     except Exception as e:
@@ -151,33 +151,33 @@ def sync_jobs_from_mssql():
 
 def sync_to_queue_items():
     """
-    Syncs data from JobsBms to QueueItem based on linked_job_no.
+    Sync ข้อมูลจาก JobsBms ไปยัง QueueItem โดยเช็คจาก linked_job_no
     """
     from .models import QueueItem, QueueStatus, JobsBms
     
     
-    # Ensure default status 'Waiting' exists
-    # User requested default status_id = 1
+    # ตรวจสอบว่ามีสถานะเริ่มต้น 'Waiting' หรือยัง
+    # ผู้ใช้งานต้องการให้ default status_id = 1
     try:
         waiting_status = QueueStatus.objects.get(id=1)
     except QueueStatus.DoesNotExist:
-        # Fallback if ID 1 doesn't exist (unlikely if seeded, but safe)
+        # กรณีที่ไม่มี ID 1 (ไม่น่าเกิดขึ้นถ้า Seed ไว้แล้ว แต่กันเหนียว)
         waiting_status, _ = QueueStatus.objects.get_or_create(
             id=1,
             defaults={'code': 'waiting', 'name': 'Waiting', 'color': 'warning'}
         )
     
-    # Get un-synced jobs ordered by req_date
-    # We use linked_job_no to check existence
+    # ดึง Job ที่ยังไม่เคย Sync โดยเรียงตามวันที่แจ้งซ่อม (req_date)
+    # เราใช้ linked_job_no เพื่อตรวจสอบว่าเคยมีแล้วหรือยัง
     existing_linked_ids = QueueItem.objects.filter(linked_job_no__isnull=False).values_list('linked_job_no', flat=True)
     
     jobs_to_sync = JobsBms.objects.exclude(jobno__in=existing_linked_ids).order_by('req_date')
     
     for job in jobs_to_sync:
-        # Generate Queue Number: IT-{running_number}
-        # We need to find the last queue number to increment. 
-        # But wait, requirement says "running number by req_date asc".
-        # If we just append, it works for new items.
+        # สร้างเลขคิว: IT-{running_number}
+        # เราต้องหาเลขคิวล่าสุดแล้วบวกเพิ่มไปเรื่อยๆ
+        # (Requirement บอกว่ารัน running number ตามวันที่ req_date)
+        # ถ้าเรา append ไปเรื่อยๆ มันก็จะ work สำหรับรายการใหม่
         
         last_item = QueueItem.objects.all().order_by('id').last()
         if last_item and last_item.queue_number.startswith('IT-'):
@@ -191,7 +191,7 @@ def sync_to_queue_items():
             
         queue_number = f"IT-{new_num:04d}"
         
-        # Check collision just in case (though we check last_item, concurrency might be an issue but low traffic assumed)
+        # ตรวจสอบว่าเลขคิวซ้ำหรือไม่กันเหนียว (แม้จะเช็ค last_item มาแล้ว แต่อาจมี concurrency ได้ แม้ traffic จะไม่เยอะ)
         while QueueItem.objects.filter(queue_number=queue_number).exists():
             new_num += 1
             queue_number = f"IT-{new_num:04d}"

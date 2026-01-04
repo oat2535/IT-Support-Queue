@@ -9,8 +9,8 @@ class QueueAppConfig(AppConfig):
         import os
         from . import scheduler
         
-        # Prevent scheduler from starting twice when using runserver with autoreload
-        # RUN_MAIN is set by the auto-reloader
+        # ป้องกันไม่ให้ scheduler รันซ้ำ 2 รอบ เวลาใช้ runserver ที่มี autoreload
+        # RUN_MAIN จะถูก set โดย auto-reloader ของ Django
         if os.environ.get('RUN_MAIN', None) == 'true':
             scheduler.start()
 

@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 def start():
     scheduler = BackgroundScheduler()
-    # Run sync every 1 minute for testing, can be adjusted
+    # ตั้งให้รัน Sync ทุกๆ 1 นาที (ปรับเปลี่ยนได้ตามความเหมาะสม)
     scheduler.add_job(sync_jobs_from_mssql, 'interval', minutes=1, id='sync_mssql_job', replace_existing=True)
     scheduler.start()
     logger.info("APScheduler started: Syncing MSSQL jobs every 1 minute.")

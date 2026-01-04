@@ -4,31 +4,31 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
 from .models import QueueItem, QueueStatus, JobsBms
 from .utils import sync_jobs_from_mssql 
-# Sync is now handled by management command: python manage.py import_job_analysis
+# การ Sync ข้อมูลถูกจัดการโดย management command แล้ว: python manage.py import_job_analysis
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
 import random
 
 def dashboard(request):
-    # We rely on the management command to sync data now.
-    # sync_jobs_from_mssql() is removed from here to improve performance
+    # เราใช้ management command ในการ sync ข้อมูลแล้ว
+    # sync_jobs_from_mssql() ถูกนำออกจากตรงนี้เพื่อเพิ่มประสิทธิภาพการทำงาน
     
-    # query QueueItem instead of JobsBms
+    # query ข้อมูลจาก QueueItem แทน JobsBms
     items = QueueItem.objects.all()
     
     total_today = items.count()
     
-    # Status Counts
+    # นับจำนวนตามสถานะ
     waiting_count = items.filter(status__code='WAITING').count()
     active_count = items.filter(status__code='ACTIVE').count()
     done_count = items.filter(status__code='DONE').count()
     
-    # Current Active Queue
+    # คิวที่กำลังเรียกอยู่ปัจจุบัน
     current_queue = items.filter(status__code='ACTIVE').order_by('created_at').first()
     
-    # Filter Logic
-    status_filter = request.GET.get('status', 'waiting') # Keep URL param lowercase for aesthetics if desired, but map to upper
+    # Logic การกรองข้อมูล
+    status_filter = request.GET.get('status', 'waiting') # เก็บ URL param เป็นตัวเล็กเพื่อความสวยงาม แต่จะ map เป็นตัวใหญ่ในการ query
     search_query = request.GET.get('q', '')
     
     if status_filter == 'active':
@@ -47,7 +47,7 @@ def dashboard(request):
         queue_list = items.filter(status__code='WAITING').order_by('created_at')
         list_title = "รายการที่รอคิว (Waiting)"
 
-    # Search Logic
+    # Logic การค้นหา
     if search_query:
         queue_list = queue_list.filter(
             Q(issue_description__icontains=search_query) | 
@@ -55,8 +55,8 @@ def dashboard(request):
             Q(queue_number__icontains=search_query)
         )
 
-    # Pagination Logic
-    paginator = Paginator(queue_list, 5) # 5 items per page
+    # Logic การแบ่งหน้า (Pagination)
+    paginator = Paginator(queue_list, 5) # แสดง 5 รายการต่อหน้า
     page = request.GET.get('page')
     try:
         queue_list = paginator.page(page)
@@ -85,7 +85,7 @@ def update_job_description(request):
         try:
             data = json.loads(request.body)
             item_id = data.get('id')
-            comment = data.get('comment') # Changed from description to comment
+            comment = data.get('comment') # เปลี่ยนจาก description เป็น comment
             
             queue_item = QueueItem.objects.get(id=item_id)
             queue_item.comment = comment
@@ -103,21 +103,21 @@ def add_queue_item(request):
     return redirect('dashboard')
 
 def call_next_queue(request):
-    # Check if there is currently an active queue
+    # ตรวจสอบว่ามีคิวที่กำลัง Active อยู่หรือไม่
     try:
         active_status = QueueStatus.objects.get(code='ACTIVE')
         waiting_status = QueueStatus.objects.get(code='WAITING')
     except QueueStatus.DoesNotExist:
-        # Avoid crashing if status doesn't exist, maybe redirect or log
+        # ป้องกันการ error หากไม่พบสถานะ อาจจะ redirect หรือ log เก็บไว้
         return redirect('dashboard')
     
     current_active = QueueItem.objects.filter(status=active_status).exists()
     
     if current_active:
-        # Cannot call next if one is already active (handled by UI but good for safety)
+        # ไม่สามารถเรียกคิวถัดไปได้หากมีคิว Active อยู่ (UI อาจจะจัดการแล้วแต่เช็คเพื่อความชัวร์)
         pass 
     else:
-        # Get next waiting item
+        # ดึงรายคิวถัดไปที่รออยู่ (Waiting)
         next_item = QueueItem.objects.filter(status=waiting_status).order_by('created_at').first()
         if next_item:
             next_item.status = active_status
@@ -132,7 +132,7 @@ def finish_current_queue(request):
     except QueueStatus.DoesNotExist:
         return redirect('dashboard')
     
-    # Get current active item
+    # ดึงรายการที่กำลัง Active อยู่ตอนนี้
     current_items = QueueItem.objects.filter(status=active_status)
     
     for item in current_items:

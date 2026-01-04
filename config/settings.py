@@ -12,23 +12,23 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# สร้าง path ภายในโปรเจค เช่น: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
+# คำเตือนความปลอดภัย: เก็บ secret key นี้ไว้เป็นความลับในการใช้งานจริง!
 SECRET_KEY = 'django-insecure-9pu5zuv&jatunkihcs_si=^^1(k#_yg=a4(v%l#2^3h%_%15=v'
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# คำเตือนความปลอดภัย: อย่าเปิด debug mode ในการใช้งานจริง (Production)!
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
 
-# Application definition
+# การกำหนด Application ในระบบ
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -71,7 +71,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
-# Database
+# ฐานข้อมูล
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
@@ -89,7 +89,7 @@ DATABASES = {
 }
 
 
-# Password validation
+# การตรวจสอบความปลอดภัยของรหัสผ่าน
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -108,7 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
+# การตั้งค่าภาษาและเขตเวลา (Internationalization)
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
 LANGUAGE_CODE = 'th-th'
@@ -120,7 +120,7 @@ USE_I18N = True
 USE_TZ = False
 
 
-# Static files (CSS, JavaScript, Images)
+# ไฟล์ Static (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
@@ -128,7 +128,12 @@ STATICFILES_DIRS = [
     BASE_DIR / "startbootstrap-sb-admin-2-gh-pages",
 ]
 
-# Default primary key field type
+# สำหรับ HTTPS
+CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com']
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+# ประเภทของ Auto-field (Primary Key) เริ่มต้น
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

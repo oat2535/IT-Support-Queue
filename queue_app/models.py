@@ -4,7 +4,7 @@ from django.utils import timezone
 class QueueStatus(models.Model):
     name = models.CharField(max_length=50)
     code = models.CharField(max_length=20, unique=True)
-    color = models.CharField(max_length=20, default='secondary') # primary, success, warning, etc.
+    color = models.CharField(max_length=20, default='secondary') # primary, success, warning, etc. (สีปุ่มที่ใช้ในหน้าเว็บ)
 
     def __str__(self):
         return self.name
@@ -17,7 +17,7 @@ class QueueItem(models.Model):
     comment = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     
-    # Link to JobsBms
+    # เชื่อมโยงกับ JobsBms (ระบบงานซ่อมเก่า)
     linked_job_no = models.IntegerField(null=True, blank=True, unique=True, db_index=True)
     
     status = models.ForeignKey(
@@ -60,11 +60,11 @@ class JobsBms(models.Model):
     enterdate = models.DateTimeField(null=True, blank=True)
     enterby = models.CharField(max_length=100, null=True, blank=True)
     
-    # New fields from join
+    # ฟิลด์ใหม่จากการ join ตารางแผนก
     abb_desc = models.CharField(max_length=100, null=True, blank=True)
     descriptions = models.TextField(null=True, blank=True)
     
-    # Calculated fields
+    # ฟิลด์ที่คำนวณขึ้นมาเอง
     difficulty = models.IntegerField(null=True, blank=True)
     job_category_type = models.CharField(max_length=50, null=True, blank=True)
 
@@ -73,7 +73,7 @@ class JobsBms(models.Model):
         ordering = ['-req_date']
 
     def save(self, *args, **kwargs):
-        # List of datetime fields to clean
+        # รายการฟิลด์วันที่ที่ต้องการลบเศษวินาที (microsecond)
         dt_fields = ['jobdate', 'assign_date', 'arrive_date', 'req_date', 
                      'act_dstart', 'act_dfin', 'return_date', 'enterdate']
         for field in dt_fields:
