@@ -17,12 +17,12 @@ def dashboard(request):
     # query ข้อมูลจาก QueueItem แทน JobsBms
     items = QueueItem.objects.all()
     
-    total_today = items.count()
-    
     # นับจำนวนตามสถานะ
     waiting_count = items.filter(status__code='WAITING').count()
     active_count = items.filter(status__code='ACTIVE').count()
     done_count = items.filter(status__code='DONE').count()
+    coordinating_count = items.filter(status__code='COORDINATING').count()
+    waiting_parts_count = items.filter(status__code='WAITING_PARTS').count()
     
     # Fetch specific statuses for the dropdown (Waiting, Coordinating, Waiting Parts)
     target_codes = ['WAITING', 'COORDINATING', 'WAITING_PARTS']
@@ -41,12 +41,12 @@ def dashboard(request):
     elif status_filter == 'done':
         queue_list = items.filter(status__code='DONE').order_by('created_at')
         list_title = "รายการที่เสร็จสิ้น (Done)"
+    elif status_filter == 'pending':
+        queue_list = items.filter(status__code__in=['COORDINATING', 'WAITING_PARTS']).order_by('created_at')
+        list_title = "รายการที่อยู่ระหว่างประสานงานและรออะไหล่"
     elif status_filter == 'waiting':
         queue_list = items.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number')
         list_title = "รายการที่รอคิว (Waiting)"
-    elif status_filter == 'total':
-        queue_list = items.order_by('-is_urgent', 'queue_number')
-        list_title = "รายการคิวทั้งหมด"
     else:
         queue_list = items.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number')
         list_title = "รายการที่รอคิว (Waiting)"
@@ -86,10 +86,11 @@ def dashboard(request):
         pass
 
     context = {
-        'total_today': total_today,
         'waiting_count': waiting_count,
         'active_count': active_count,
         'done_count': done_count,
+        'coordinating_count': coordinating_count,
+        'waiting_parts_count': waiting_parts_count,
         'current_queue': current_queue,
         'queue_list': queue_list,
         'list_title': list_title,
