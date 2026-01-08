@@ -387,7 +387,14 @@
                 success: function(response) {
                     if(response.success) {
                         $('#descModal').modal('hide');
-                        window.location.reload();
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'บันทึกข้อมูลเรียบร้อย',
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => {
+                            window.location.reload();
+                        });
                     } else {
                         Swal.fire({
                             icon: 'error',
