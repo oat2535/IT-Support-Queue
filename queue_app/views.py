@@ -24,6 +24,10 @@ def dashboard(request):
     active_count = items.filter(status__code='ACTIVE').count()
     done_count = items.filter(status__code='DONE').count()
     
+    # Fetch specific statuses for the dropdown (Waiting, Coordinating, Waiting Parts)
+    target_codes = ['WAITING', 'COORDINATING', 'WAITING_PARTS']
+    all_statuses = QueueStatus.objects.filter(code__in=target_codes).order_by('id')
+    
     # คิวที่กำลังเรียกอยู่ปัจจุบัน
     current_queue = items.filter(status__code='ACTIVE').order_by('created_at').first()
     
@@ -92,6 +96,7 @@ def dashboard(request):
         'active_filter': status_filter,
         'search_query': search_query,
         'is_admin_computer': is_admin_computer,
+        'all_statuses': all_statuses,
     }
     
     return render(request, 'queue_app/dashboard.html', context)
@@ -103,9 +108,18 @@ def update_job_description(request):
             data = json.loads(request.body)
             item_id = data.get('id')
             comment = data.get('comment') # เปลี่ยนจาก description เป็น comment
+            status_id = data.get('status_id')
             
             queue_item = QueueItem.objects.get(id=item_id)
             queue_item.comment = comment
+            
+            if status_id:
+                try:
+                    new_status = QueueStatus.objects.get(id=status_id)
+                    queue_item.status = new_status
+                except QueueStatus.DoesNotExist:
+                    pass
+            
             queue_item.save()
             
             return JsonResponse({'success': True})
