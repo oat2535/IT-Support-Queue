@@ -8,7 +8,7 @@ from .utils import sync_jobs_from_mssql
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
-import random
+import socket
 
 def dashboard(request):
     # เราใช้ management command ในการ sync ข้อมูลแล้ว
@@ -38,13 +38,13 @@ def dashboard(request):
         queue_list = items.filter(status__code='DONE').order_by('created_at')
         list_title = "รายการที่เสร็จสิ้น (Done)"
     elif status_filter == 'waiting':
-        queue_list = items.filter(status__code='WAITING').order_by('created_at')
+        queue_list = items.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number')
         list_title = "รายการที่รอคิว (Waiting)"
     elif status_filter == 'total':
-        queue_list = items.order_by('created_at')
+        queue_list = items.order_by('-is_urgent', 'queue_number')
         list_title = "รายการคิวทั้งหมด"
     else:
-        queue_list = items.filter(status__code='WAITING').order_by('created_at')
+        queue_list = items.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number')
         list_title = "รายการที่รอคิว (Waiting)"
 
     # Logic การค้นหา
@@ -65,6 +65,22 @@ def dashboard(request):
     except EmptyPage:
         queue_list = paginator.page(paginator.num_pages)
 
+    # ตรวจสอบชื่อเครื่อง
+    is_admin_computer = False
+    client_ip = request.META.get('REMOTE_ADDR')
+    try:
+        # พยายาม resolve hostname
+        hostname, alias, iplist = socket.gethostbyaddr(client_ip)
+        print(f"DEBUG: Client IP={client_ip}, Hostname={hostname}") # Debugging
+        
+        # ตรวจสอบว่าชื่อเครื่องตรงกับที่กำหนดหรือไม่ (Case insensitive)
+        if 'DESKTOP-TIC1FOD' in hostname.upper():
+            is_admin_computer = True
+    except Exception as e:
+        print(f"DEBUG: Could not resolve hostname for {client_ip}: {e}")
+        # กรณี resolve ไม่ได้ จะไม่ให้สิทธิ์ admin
+        pass
+
     context = {
         'total_today': total_today,
         'waiting_count': waiting_count,
@@ -75,6 +91,7 @@ def dashboard(request):
         'list_title': list_title,
         'active_filter': status_filter,
         'search_query': search_query,
+        'is_admin_computer': is_admin_computer,
     }
     
     return render(request, 'queue_app/dashboard.html', context)
@@ -99,29 +116,54 @@ def update_job_description(request):
             
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
+@csrf_exempt
+def toggle_urgent_status(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            item_id = data.get('id')
+            is_urgent = data.get('is_urgent') # รับค่ามาเป็น 1 หรือ 0 หรือ boolean
+            
+            # แปลงเป็น integer (0 หรือ 1)
+            if is_urgent is True or is_urgent == 'true' or is_urgent == 1:
+                urgent_val = 1
+            else:
+                urgent_val = 0
+            
+            queue_item = QueueItem.objects.get(id=item_id)
+            queue_item.is_urgent = urgent_val
+            queue_item.save()
+            
+            return JsonResponse({'success': True})
+        except QueueItem.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Queue Item not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+            
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
 def add_queue_item(request):
     return redirect('dashboard')
 
 def call_next_queue(request):
-    # ตรวจสอบว่ามีคิวที่กำลัง Active อยู่หรือไม่
     try:
         active_status = QueueStatus.objects.get(code='ACTIVE')
         waiting_status = QueueStatus.objects.get(code='WAITING')
+        done_status = QueueStatus.objects.get(code='DONE')
     except QueueStatus.DoesNotExist:
-        # ป้องกันการ error หากไม่พบสถานะ อาจจะ redirect หรือ log เก็บไว้
         return redirect('dashboard')
     
-    current_active = QueueItem.objects.filter(status=active_status).exists()
+    # 1. จบงานปัจจุบัน (ถ้ามี)
+    current_active_items = QueueItem.objects.filter(status=active_status)
+    for item in current_active_items:
+        item.status = done_status
+        item.save()
     
-    if current_active:
-        # ไม่สามารถเรียกคิวถัดไปได้หากมีคิว Active อยู่ (UI อาจจะจัดการแล้วแต่เช็คเพื่อความชัวร์)
-        pass 
-    else:
-        # ดึงรายคิวถัดไปที่รออยู่ (Waiting)
-        next_item = QueueItem.objects.filter(status=waiting_status).order_by('created_at').first()
-        if next_item:
-            next_item.status = active_status
-            next_item.save()
+    # 2. เรียกคิวถัดไป (Priority: Urgent > Normal, then Queue Number)
+    next_item = QueueItem.objects.filter(status=waiting_status).order_by('-is_urgent', 'queue_number').first()
+    if next_item:
+        next_item.status = active_status
+        next_item.save()
             
     return redirect('dashboard')
 

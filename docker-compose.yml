@@ -13,3 +13,15 @@ services:
     # ตั้งค่าให้ log output แสดงผลทันที (ไม่ buffer)
     tty: true
     stdin_open: true
+    networks:
+      - app_network
+    extra_hosts:
+      - "DESKTOP-TIC1FOD:172.25.0.1"
+
+networks:
+  app_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+          gateway: 172.25.0.1

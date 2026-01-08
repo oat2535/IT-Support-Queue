@@ -15,6 +15,7 @@ class QueueItem(models.Model):
     user_department = models.CharField(max_length=100)
     issue_description = models.TextField()
     comment = models.TextField(null=True, blank=True)
+    is_urgent = models.IntegerField(default=0) # สถานะเร่งด่วน (0=ปกติ, 1=เร่งด่วน)
     created_at = models.DateTimeField(default=timezone.now)
     
     # เชื่อมโยงกับ JobsBms (ระบบงานซ่อมเก่า)
