@@ -28,8 +28,11 @@ def dashboard(request):
     target_codes = ['WAITING', 'COORDINATING', 'WAITING_PARTS']
     all_statuses = QueueStatus.objects.filter(code__in=target_codes).order_by('id')
     
-    # คิวที่กำลังเรียกอยู่ปัจจุบัน
-    current_queue = items.filter(status__code='ACTIVE').order_by('created_at').first()
+    # คิวที่กำลังเรียกอยู่ปัจจุบัน (Normal)
+    current_queue = items.filter(status__code='ACTIVE', is_adhoc=0).order_by('created_at').first()
+    
+    # คิว Ad-hoc ที่กำลัง Active
+    current_adhoc = items.filter(status__code='ACTIVE', is_adhoc=1).order_by('created_at').first()
     
     # Logic การกรองข้อมูล
     status_filter = request.GET.get('status', 'waiting') # เก็บ URL param เป็นตัวเล็กเพื่อความสวยงาม แต่จะ map เป็นตัวใหญ่ในการ query
@@ -116,6 +119,8 @@ def dashboard(request):
         'search_query': search_query,
         'is_admin_computer': is_admin_computer,
         'all_statuses': all_statuses,
+        'all_statuses': all_statuses,
+        'current_adhoc': current_adhoc,
     }
     
     return render(request, 'queue_app/dashboard.html', context)
@@ -186,8 +191,8 @@ def call_next_queue(request):
     except QueueStatus.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'System statuses not defined'})
     
-    # 1. ตรวจสอบงานปัจจุบันก่อนปิด (Validation Logic)
-    current_active_items = QueueItem.objects.filter(status=active_status)
+    # 1. ตรวจสอบงานปัจจุบันก่อนปิด (Validation Logic) -> เฉพาะ Normal Queue
+    current_active_items = QueueItem.objects.filter(status=active_status, is_adhoc=0)
     for item in current_active_items:
         # ถ้ามีการเชื่อมโยงกับ Job BMS
         if item.linked_job_no:
@@ -229,8 +234,65 @@ def finish_current_queue(request):
     except QueueStatus.DoesNotExist:
         return redirect('dashboard')
     
-    # ดึงรายการที่กำลัง Active อยู่ตอนนี้
-    current_items = QueueItem.objects.filter(status=active_status)
+    # ดึงรายการที่กำลัง Active อยู่ตอนนี้ (เฉพาะ Normal)
+    current_items = QueueItem.objects.filter(status=active_status, is_adhoc=0)
+    
+    for item in current_items:
+        item.status = done_status
+        item.save()
+        
+    return redirect('dashboard')
+
+@csrf_exempt
+def insert_queue_adhoc(request):
+    """
+    แทรกคิว (Ad-hoc)
+    - เปลี่ยนสถานะคิวที่เลือกเป็น ACTIVE (2)
+    - เงื่อนไข: ต้องไม่มีคิวที่กำลัง ACTIVE อยู่ในขณะนั้น
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            item_id = data.get('id')
+            
+            # 1. ตรวจสอบว่ามีคิว *Ad-hoc* ที่กำลังดำเนินการอยู่หรือไม่ (Normal ไม่เกี่ยว)
+            active_status = QueueStatus.objects.get(code='ACTIVE')
+            if QueueItem.objects.filter(status=active_status, is_adhoc=1).exists():
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'มีรายการคิวแทรก (Ad-hoc) ที่กำลังดำเนินการอยู่ ไม่สามารถแทรกคิวซ้ำซ้อนได้ กรุณาจบงานคิวแทรกปัจจุบันก่อน'
+                })
+            
+            # 2. ดึงข้อมูลคิวที่ต้องการแทรก
+            queue_item = QueueItem.objects.get(id=item_id)
+            
+            # 3. อัปเดตสถานะเป็น ACTIVE
+            queue_item.status = active_status
+            queue_item.call_queue_date = timezone.now() # บันทึกเวลาที่เรียกคิว
+            queue_item.is_adhoc = 1 # เป็นคิวที่ถูกแทรก
+            
+            queue_item.save()
+            
+            return JsonResponse({'success': True})
+            
+        except QueueItem.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Queue Item not found'})
+        except QueueStatus.DoesNotExist:
+             return JsonResponse({'success': False, 'error': 'Status ACTIVE not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+            
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+def finish_adhoc_queue(request):
+    try:
+        active_status = QueueStatus.objects.get(code='ACTIVE')
+        done_status = QueueStatus.objects.get(code='DONE')
+    except QueueStatus.DoesNotExist:
+        return redirect('dashboard')
+    
+    # ดึงรายการ Ad-hoc ที่กำลัง Active อยู่ตอนนี้
+    current_items = QueueItem.objects.filter(status=active_status, is_adhoc=1)
     
     for item in current_items:
         item.status = done_status

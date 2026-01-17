@@ -31,6 +31,9 @@ class QueueItem(models.Model):
     
     # วันที่กดเรียกคิว (status -> 2 / ACTIVE)
     call_queue_date = models.DateTimeField(null=True, blank=True)
+    
+    # เป็นคิวที่ถูกแทรก (Ad-hoc) 0=Normal, 1=Adhoc
+    is_adhoc = models.IntegerField(default=0)
 
     def save(self, *args, **kwargs):
         if self.created_at:

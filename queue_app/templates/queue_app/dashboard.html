@@ -66,9 +66,11 @@
     </div>
 
     <!-- Current Queue & Status -->
+    <!-- Current Queue & Status -->
     <div class="row">
-        <div class="col-lg-12 mb-4">
-            <div class="card current-queue-card shadow mb-4 border-left-info">
+        <!-- Normal Active Queue -->
+        <div class="{% if current_adhoc %}col-lg-6{% else %}col-lg-12{% endif %} mb-4">
+            <div class="card current-queue-card shadow mb-4 border-left-info h-100">
                 <div class="card-header py-3 bg-white border-0">
                     <h5 class="m-0 font-weight-bold text-primary"><i class="fas fa-bullhorn mr-2"></i> กำลังดำเนินการ</h5>
                 </div>
@@ -110,6 +112,47 @@
                 </div>
             </div>
         </div>
+
+        <!-- Ad-hoc Active Queue (Right Side) -->
+        {% if current_adhoc %}
+        <div class="col-lg-6 mb-4">
+            <div class="card current-queue-card shadow mb-4 border-left-warning h-100" style="background-color: #fffaf0;">
+                <div class="card-header py-3 bg-white border-0">
+                    <h5 class="m-0 font-weight-bold text-warning"><i class="fas fa-bolt mr-2"></i> คิวแทรก (Ad-hoc)</h5>
+                </div>
+                <div class="card-body text-center py-5">
+                    <p class="mb-2 text-gray-500">หมายเลขคิวแทรก</p>
+                    
+                     <div class="queue-number-large text-warning">{{ current_adhoc.queue_number }}</div>
+                     <h2 class="font-weight-bold text-gray-800">{{ current_adhoc.user_name }}</h2>
+                     <p class="text-muted mb-2">{{ current_adhoc.user_department }} - <span data-toggle="tooltip" data-placement="top" data-html="true" title="{{ current_adhoc.issue_description|linebreaksbr }}">{{ current_adhoc.issue_description|truncatechars:50 }}</span></p>
+                     <div class="mb-4">
+                         <span class="badge badge-warning badge-pill px-4 py-2 text-white" style="font-size: 1.2rem;">กำลังดำเนินการ (แทรก)</span>
+                         
+                         {% if is_admin_computer or current_adhoc.comment %}
+                            <button class="btn btn-sm {% if current_adhoc.comment %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
+                                    onclick="openDescModal('{{ current_adhoc.id }}', '{% if current_adhoc.comment %}{{ current_adhoc.comment|escapejs }}{% endif %}', '{{ current_adhoc.status.id }}', '{{ current_adhoc.bms_note|escapejs }}')"
+                                    title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true" style="width: 32px; height: 32px;">
+                               {% if current_adhoc.comment or current_adhoc.bms_note %}
+                                 <i class="fas fa-sticky-note"></i>
+                               {% else %}
+                                 <i class="fas fa-plus"></i>
+                               {% endif %}
+                            </button>
+                        {% endif %}
+                     </div>
+                     
+                     {% if is_admin_computer %}
+                     <div class="mt-4">
+                          <a href="{% url 'finish_adhoc' %}" class="btn btn-warning btn-lg px-5 shadow-sm text-white">
+                             <i class="fas fa-check-circle mr-2"></i>จบงานแทรก
+                         </a>
+                     </div>
+                     {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <!-- Next Queues List -->
@@ -168,12 +211,27 @@
                                 <td data-toggle="tooltip" data-placement="top" data-html="true" title="{{ item.issue_description|linebreaksbr }}">
                                     {{ item.issue_description|truncatechars:60 }}
                                     
-                                    {% if is_admin_computer %}
-                                    <span class="urgent-icon-btn {% if item.is_urgent == 1 %}urgent-active{% else %}urgent-inactive{% endif %}"
-                                       onclick="toggleUrgent('{{ item.id }}', this)" 
-                                       title="Mark as Urgent" data-toggle="tooltip">🚨</span>
-                                    {% elif item.is_urgent == 1 %}
-                                    <span class="urgent-icon-btn urgent-active" style="cursor: default;" title="Urgent">🚨</span>
+                                    {% if is_admin_computer and item.status.code == 'WAITING' %}
+                                        <span class="urgent-icon-btn {% if item.is_urgent == 1 %}urgent-active{% else %}urgent-inactive{% endif %}"
+                                           onclick="toggleUrgent('{{ item.id }}', this)" 
+                                           title="Mark as Urgent" data-toggle="tooltip">🚨</span>
+                                        
+                                        <!-- Ad-hoc (Insert Queue) Button -->
+                                        <span class="urgent-icon-btn text-warning ml-2" 
+                                              style="font-size: 1.2rem;"
+                                              onclick="insertQueue('{{ item.id }}')"
+                                              title="แทรกคิว (Ad-hoc)" data-toggle="tooltip">
+                                            <i class="fas fa-bolt"></i>
+                                        </span>
+                                    {% else %}
+                                        {% if item.is_urgent == 1 %}
+                                            <span class="urgent-icon-btn urgent-active" style="cursor: default;" title="Urgent">🚨</span>
+                                        {% endif %}
+                                        {% if item.is_adhoc == 1 %}
+                                            <span class="urgent-icon-btn text-warning ml-2" style="font-size: 1.2rem; cursor: default;" title="รายการแทรกคิว (Ad-hoc)">
+                                                <i class="fas fa-bolt"></i>
+                                            </span>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 <td class="text-center">
@@ -263,14 +321,6 @@
           </div>
           <div class="modal-body">
             <input type="hidden" id="modal-job-id">
-            <div class="form-group">
-                <label for="modal-status-select">สถานะ / Status:</label>
-                <select class="form-control" id="modal-status-select">
-                    {% for status in all_statuses %}
-                    <option value="{{ status.id }}">{{ status.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
             <div class="form-group">
                 <label for="modal-bms-note">รายละเอียดแก้ไข / Note(BMS):</label>
                 <textarea class="form-control" id="modal-bms-note" rows="3" readonly style="background-color: #e9ecef;"></textarea>
@@ -365,19 +415,16 @@
         function openDescModal(id, comment, statusId, bmsNote) {
             $('#modal-job-id').val(id);
             $('#modal-desc-text').val(comment);
-            $('#modal-status-select').val(statusId);
             $('#modal-bms-note').val(bmsNote);
             
             if (!IS_ADMIN) {
                 // Read-only mode for non-admin
                 $('#modal-desc-text').prop('disabled', true);
-                $('#modal-status-select').prop('disabled', true);
                 $('#descModal .modal-footer .btn-primary').hide(); // Hide Save button
                 $('#descModalLabel').text('รายละเอียดเพิ่มเติม (Read Only)');
             } else {
                 // Edit mode for admin
                 $('#modal-desc-text').prop('disabled', false);
-                $('#modal-status-select').prop('disabled', false);
                 $('#descModal .modal-footer .btn-primary').show(); // Show Save button
                 $('#descModalLabel').text('รายละเอียดเพิ่มเติม');
             }
@@ -388,12 +435,11 @@
         function saveDescription() {
             var id = $('#modal-job-id').val();
             var comment = $('#modal-desc-text').val();
-            var statusId = $('#modal-status-select').val();
             
             $.ajax({
                 url: '{% url "update_job_desc" %}',
                 type: 'POST',
-                data: JSON.stringify({id: id, comment: comment, status_id: statusId}),
+                data: JSON.stringify({id: id, comment: comment}),
                 contentType: 'application/json',
                 success: function(response) {
                     if(response.success) {
@@ -456,6 +502,46 @@
                         });
                 }
             });
+        }
+        
+        function insertQueue(id) {
+            Swal.fire({
+                title: 'ต้องการแทรกคิวงานนี้ใช่หรือไม่?',
+                text: "งานนี้จะถูกเปลี่ยนสถานะเป็นกำลังดำเนินการทันที",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ใช่, แทรกคิวเลย!',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '{% url "insert_queue" %}',
+                        type: 'POST',
+                        data: JSON.stringify({id: id}),
+                        contentType: 'application/json',
+                        success: function(response) {
+                            if(response.success) {
+                                window.location.reload();
+                            } else {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ไม่สามารถแทรกคิวได้',
+                                    text: response.error
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Connection Error',
+                                text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+                            });
+                        }
+                    });
+                }
+            })
         }
         
         function toggleAdminMenu() {

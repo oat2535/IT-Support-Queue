@@ -8,4 +8,6 @@ urlpatterns = [
     path('finish-queue/', views.finish_current_queue, name='finish_queue'),
     path('update-job-desc/', views.update_job_description, name='update_job_desc'),
     path('toggle-urgent/', views.toggle_urgent_status, name='toggle_urgent'),
+    path('insert-queue/', views.insert_queue_adhoc, name='insert_queue'),
+    path('finish-adhoc/', views.finish_adhoc_queue, name='finish_adhoc'),
 ]
