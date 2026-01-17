@@ -83,9 +83,9 @@
                             <span class="badge badge-info badge-pill px-4 py-2" style="font-size: 1.2rem;">กำลังดำเนินการ</span>
                             {% if is_admin_computer or current_queue.comment %}
                             <button class="btn btn-sm {% if current_queue.comment %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
-                                    onclick="openDescModal('{{ current_queue.id }}', '{% if current_queue.comment %}{{ current_queue.comment|escapejs }}{% endif %}', '{{ current_queue.status.id }}')"
+                                    onclick="openDescModal('{{ current_queue.id }}', '{% if current_queue.comment %}{{ current_queue.comment|escapejs }}{% endif %}', '{{ current_queue.status.id }}', '{{ current_queue.bms_note|escapejs }}')"
                                     title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true" style="width: 32px; height: 32px;">
-                               {% if current_queue.comment %}
+                               {% if current_queue.comment or current_queue.bms_note %}
                                  <i class="fas fa-sticky-note"></i>
                                {% else %}
                                  <i class="fas fa-plus"></i>
@@ -154,7 +154,13 @@
                         <tbody>
                             {% for item in queue_list %}
                             <tr>
-                                <td class="font-weight-bold text-primary">{{ item.queue_number }}</td>
+                                <td class="font-weight-bold text-primary">
+                                    {% if active_filter == 'waiting' %}
+                                        {{ item.waiting_rank }}
+                                    {% else %}
+                                        {{ item.queue_number }}
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <div class="font-weight-bold text-gray-800">{{ item.user_name }}</div>
                                 </td>
@@ -171,11 +177,11 @@
                                     {% endif %}
                                 </td>
                                 <td class="text-center">
-                                    {% if is_admin_computer or item.comment %}
-                                    <button class="btn btn-sm {% if item.comment %}btn-info{% else %}btn-outline-secondary{% endif %} desc-btn" 
-                                            onclick="openDescModal('{{ item.id }}', '{% if item.comment %}{{ item.comment|escapejs }}{% endif %}', '{{ item.status.id }}')"
+                                    {% if is_admin_computer or item.comment or item.bms_note %}
+                                    <button class="btn btn-sm {% if item.comment or item.bms_note %}btn-info{% else %}btn-outline-secondary{% endif %} desc-btn" 
+                                            onclick="openDescModal('{{ item.id }}', '{% if item.comment %}{{ item.comment|escapejs }}{% endif %}', '{{ item.status.id }}', '{{ item.bms_note|escapejs }}')"
                                             title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true">
-                                       {% if item.comment %}
+                                       {% if item.comment or item.bms_note %}
                                          <i class="fas fa-sticky-note"></i>
                                        {% else %}
                                          <i class="fas fa-plus"></i>
@@ -266,6 +272,10 @@
                 </select>
             </div>
             <div class="form-group">
+                <label for="modal-bms-note">รายละเอียดแก้ไข / Note(BMS):</label>
+                <textarea class="form-control" id="modal-bms-note" rows="3" readonly style="background-color: #e9ecef;"></textarea>
+            </div>
+            <div class="form-group">
                 <label for="modal-desc-text">หมายเหตุ / Comment:</label>
                 <textarea class="form-control" id="modal-desc-text" rows="5"></textarea>
             </div>
@@ -352,10 +362,11 @@
     <script>
         var IS_ADMIN = "{{ is_admin_computer|yesno:'true,false' }}" === "true";
 
-        function openDescModal(id, comment, statusId) {
+        function openDescModal(id, comment, statusId, bmsNote) {
             $('#modal-job-id').val(id);
             $('#modal-desc-text').val(comment);
             $('#modal-status-select').val(statusId);
+            $('#modal-bms-note').val(bmsNote);
             
             if (!IS_ADMIN) {
                 // Read-only mode for non-admin
@@ -462,6 +473,38 @@
                 $icon.removeClass('fa-tools').addClass('fa-times');
             }
         }
+
+        // Call Next Queue AJAX
+        $('#call-next-btn').on('click', function(e) {
+            e.preventDefault();
+            var url = $(this).attr('href');
+            
+            // Show loading state if needed, or just silent wait
+            
+            $.ajax({
+                url: url,
+                type: 'GET', // Or POST if we want to be stricter, but View is likely standard handling
+                success: function(response) {
+                    if (response.success) {
+                        window.location.reload();
+                    } else {
+                         Swal.fire({
+                            icon: 'warning',
+                            title: 'ไม่สามารถเรียกคิวถัดไปได้',
+                            text: response.error,
+                            confirmButtonText: 'ตกลง'
+                        });
+                    }
+                },
+                error: function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Connection Error',
+                        text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+                    });
+                }
+            });
+        });
 
         
         // Close menu when clicking outside

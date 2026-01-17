@@ -69,6 +69,20 @@ def dashboard(request):
     except EmptyPage:
         queue_list = paginator.page(paginator.num_pages)
 
+    # Inject Rank for Waiting List (Fix: Search resets rank issue)
+    if status_filter == 'waiting':
+        try:
+             # Fetch all IDs in correct order to determine true rank
+             # Must strictly match the order_by used before filtering for consistent ranking
+             all_waiting_ids = list(QueueItem.objects.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number').values_list('id', flat=True))
+             rank_map = {pk: i+1 for i, pk in enumerate(all_waiting_ids)}
+             
+             # Attach rank to the current page's objects
+             for item in queue_list:
+                 item.waiting_rank = rank_map.get(item.id, '-')
+        except Exception as e:
+            print(f"Error calculating ranks: {e}")
+
     # ตรวจสอบชื่อเครื่อง
     is_admin_computer = False
     client_ip = request.META.get('REMOTE_ADDR')
@@ -77,8 +91,12 @@ def dashboard(request):
         hostname, alias, iplist = socket.gethostbyaddr(client_ip)
         print(f"DEBUG: Client IP={client_ip}, Hostname={hostname}") # Debugging
         
-        # ตรวจสอบว่าชื่อเครื่องตรงกับที่กำหนดหรือไม่ (Case insensitive)
-        if 'DESKTOP-TIC1FOD' in hostname.upper():
+        # รายชื่อเครื่องที่อนุญาต (ควรทำเป็น List ไว้)
+        admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24']
+
+        # ใช้ any() เพื่อเช็คว่ามีชื่อใดชื่อหนึ่งใน admin_hosts ปรากฏอยู่ใน hostname หรือไม่
+        current_hostname = hostname.upper()
+        if any(admin_host in current_hostname for admin_host in admin_hosts) or client_ip == '127.0.0.1':
             is_admin_computer = True
     except Exception as e:
         print(f"DEBUG: Could not resolve hostname for {client_ip}: {e}")
@@ -166,21 +184,43 @@ def call_next_queue(request):
         waiting_status = QueueStatus.objects.get(code='WAITING')
         done_status = QueueStatus.objects.get(code='DONE')
     except QueueStatus.DoesNotExist:
-        return redirect('dashboard')
+        return JsonResponse({'success': False, 'error': 'System statuses not defined'})
     
-    # 1. จบงานปัจจุบัน (ถ้ามี)
+    # 1. ตรวจสอบงานปัจจุบันก่อนปิด (Validation Logic)
     current_active_items = QueueItem.objects.filter(status=active_status)
+    for item in current_active_items:
+        # ถ้ามีการเชื่อมโยงกับ Job BMS
+        if item.linked_job_no:
+            try:
+                # ดึงข้อมูล Job BMS ล่าสุด
+                bms_job = JobsBms.objects.get(jobno=item.linked_job_no)
+                
+                # ตรวจสอบสถานะ (Allow only '2' or '12')
+                # หมายเหตุ: job_status เป็น CharField
+                if bms_job.job_status not in ['2', '12']:
+                     return JsonResponse({
+                         'success': False, 
+                         'error': f'ไม่สามารถกดเรียกคิวถัดไปได้ รบกวนปิดงานในระบบ BMS ก่อน (BMS Status: {bms_job.job_status})'
+                     })
+                     
+            except JobsBms.DoesNotExist:
+                # กรณีไม่เจอ Job ใน BMS (อาจจะ Sync ไม่ทัน หรือถูกลบ) 
+                # ให้ข้ามการตรวจสอบไปก่อน หรือจะ Block ก็ได้ แต่ข้ามดีกว่าเพื่อไม่ให้ระบบค้าง
+                pass
+
+    # 2. ปิดงานเก่า (ถ้าผ่าน Validation)
     for item in current_active_items:
         item.status = done_status
         item.save()
     
-    # 2. เรียกคิวถัดไป (Priority: Urgent > Normal, then Queue Number)
+    # 3. เรียกคิวถัดไป (Priority: Urgent > Normal, then Queue Number)
     next_item = QueueItem.objects.filter(status=waiting_status).order_by('-is_urgent', 'queue_number').first()
     if next_item:
         next_item.status = active_status
+        next_item.call_queue_date = timezone.now() # บันทึกเวลาที่เรียกคิว
         next_item.save()
             
-    return redirect('dashboard')
+    return JsonResponse({'success': True})
 
 def finish_current_queue(request):
     try:
