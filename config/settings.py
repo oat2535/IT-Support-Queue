@@ -74,17 +74,33 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # ฐานข้อมูล
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# ฐานข้อมูล UAT
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'imedx_tlp_for_it',
+#         'USER': 'eservices',
+#         'PASSWORD': 'Tlp@2023',
+#         'HOST': '192.168.98.254',
+#         'PORT': '5434',
+#         'OPTIONS': {
+#             'options': '-c search_path=intra_tl'
+#         }
+#     }
+# }
+
+# ฐานข้อมูล Code7
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'imedx_tlp_for_it',
+        'NAME': 'tlph',
         'USER': 'eservices',
         'PASSWORD': 'Tlp@2023',
-        'HOST': '192.168.98.254',
-        'PORT': '5434',
+        'HOST': '173.16.200.35',
+        'PORT': '5435',
         'OPTIONS': {
             'options': '-c search_path=intra_tl'
-        }
+        },
     }
 }
 

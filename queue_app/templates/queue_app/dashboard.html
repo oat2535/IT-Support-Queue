@@ -129,8 +129,8 @@
                      <div class="mb-4">
                          <span class="badge badge-warning badge-pill px-4 py-2 text-white" style="font-size: 1.2rem;">กำลังดำเนินการ (แทรก)</span>
                          
-                         {% if is_admin_computer or current_adhoc.comment %}
-                            <button class="btn btn-sm {% if current_adhoc.comment %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
+                         {% if is_admin_computer or current_adhoc.comment or current_adhoc.bms_note %}
+                            <button class="btn btn-sm {% if current_adhoc.comment or current_adhoc.bms_note %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
                                     onclick="openDescModal('{{ current_adhoc.id }}', '{% if current_adhoc.comment %}{{ current_adhoc.comment|escapejs }}{% endif %}', '{{ current_adhoc.status.id }}', '{{ current_adhoc.bms_note|escapejs }}')"
                                     title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true" style="width: 32px; height: 32px;">
                                {% if current_adhoc.comment or current_adhoc.bms_note %}
@@ -143,11 +143,7 @@
                      </div>
                      
                      {% if is_admin_computer %}
-                     <div class="mt-4">
-                          <a href="{% url 'finish_adhoc' %}" class="btn btn-warning btn-lg px-5 shadow-sm text-white">
-                             <i class="fas fa-check-circle mr-2"></i>จบงานแทรก
-                         </a>
-                     </div>
+                     <!-- Finish button moved to Admin FAB -->
                      {% endif %}
                 </div>
             </div>
@@ -217,7 +213,7 @@
                                            title="Mark as Urgent" data-toggle="tooltip">🚨</span>
                                         
                                         <!-- Ad-hoc (Insert Queue) Button -->
-                                        <span class="urgent-icon-btn text-warning ml-2" 
+                                        <span class="urgent-icon-btn {% if item.is_adhoc == 1 %}text-warning{% else %}adhoc-inactive{% endif %} ml-2" 
                                               style="font-size: 1.2rem;"
                                               onclick="insertQueue('{{ item.id }}')"
                                               title="แทรกคิว (Ad-hoc)" data-toggle="tooltip">
@@ -347,9 +343,16 @@
                 <div class="mb-3 text-gray-500 font-weight-bold" style="font-size: 0.9rem;">Admin Tools</div>
                 
                 <a href="{% url 'call_next' %}" id="call-next-btn" class="d-flex align-items-center text-dark text-decoration-none mb-3 admin-menu-item" data-active-count="{{ active_count }}">
-                    <div class="mr-3 text-warning font-weight-bold"><i class="fas fa-bullhorn"></i></div>
+                    <div class="mr-3 text-primary font-weight-bold"><i class="fas fa-bullhorn"></i></div>
                     <div>เรียกคิวถัดไป</div>
                 </a>
+
+                {% if current_adhoc %}
+                <a href="#" id="finish-adhoc-btn" class="d-flex align-items-center text-dark text-decoration-none mb-3 admin-menu-item">
+                    <div class="mr-3 text-warning font-weight-bold"><i class="fas fa-bolt"></i></div>
+                    <div>จบงานแทรก (Ad-hoc)</div>
+                </a>
+                {% endif %}
                 
             </div>
         </div>
@@ -379,10 +382,18 @@
         }
 
         /* Inactive State */
+        /* Inactive State */
         .urgent-inactive {
             color: #ccc;
             filter: grayscale(100%);
             opacity: 0.5;
+        }
+        
+        /* Ad-hoc Inactive State (Brighter) */
+        .adhoc-inactive {
+            color: #ddd; /* Lighter grey */
+            filter: grayscale(100%);
+            opacity: 0.9; /* More visible */
         }
 
         /* Active State - pulsing siren */
@@ -565,28 +576,39 @@
             e.preventDefault();
             var url = $(this).attr('href');
             
-            // Show loading state if needed, or just silent wait
-            
-            $.ajax({
-                url: url,
-                type: 'GET', // Or POST if we want to be stricter, but View is likely standard handling
-                success: function(response) {
-                    if (response.success) {
-                        window.location.reload();
-                    } else {
-                         Swal.fire({
-                            icon: 'warning',
-                            title: 'ไม่สามารถเรียกคิวถัดไปได้',
-                            text: response.error,
-                            confirmButtonText: 'ตกลง'
-                        });
-                    }
-                },
-                error: function() {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Connection Error',
-                        text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+            Swal.fire({
+                title: 'ยืนยันเรียกคิวถัดไป?',
+                text: "คุณต้องการปิดงานปัจจุบันและเรียกคิวถัดไปใช่หรือไม่",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#4e73df',
+                cancelButtonColor: '#858796',
+                confirmButtonText: 'ใช่, เรียกเลย',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: url,
+                        type: 'GET',
+                        success: function(response) {
+                            if (response.success) {
+                                window.location.reload();
+                            } else {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ไม่สามารถเรียกคิวถัดไปได้',
+                                    text: response.error,
+                                    confirmButtonText: 'ตกลง'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Connection Error',
+                                text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+                            });
+                        }
                     });
                 }
             });
@@ -616,5 +638,50 @@
                 window.location.reload();
             }
         }, 60000);
+        
+        // Finish Ad-hoc Queue AJAX
+        $('#finish-adhoc-btn').on('click', function(e) {
+            e.preventDefault();
+            
+            Swal.fire({
+                title: 'ยืนยันจบงานคิวแทรก?',
+                text: "คุณต้องการจบงานคิวแทรก (Ad-hoc) นี้ใช่หรือไม่",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ใช่, จบงานเลย',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '{% url "finish_adhoc" %}',
+                        type: 'GET', // Using GET as per original link, or move to POST if safer. Original view accepts GET? No check in code, assuming GET is default for `redirect` view logic, but mostly links are GET.
+                        // Wait, my updated view is generic. Let's stick to GET for now to match default simple view, or POST if I want to be strict.
+                        // Actually the user didn't specify method, but better use GET for consistency with previous link, or POST.
+                        // Let's use GET since I didn't enforce POST in the python view for this specific function (checked views.py, finish_adhoc_queue doesn't check method `if request.method == 'POST'`).
+                        success: function(response) {
+                            if (response.success) {
+                                window.location.reload();
+                            } else {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ไม่สามารถปิดงานได้',
+                                    text: response.error,
+                                    confirmButtonText: 'ตกลง'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Connection Error',
+                                text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+                            });
+                        }
+                    });
+                }
+            });
+        });
     </script>
 {% endblock %}

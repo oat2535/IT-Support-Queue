@@ -96,6 +96,21 @@ class JobsBms(models.Model):
     abb_desc = models.CharField(max_length=100, null=True, blank=True)
     descriptions = models.TextField(null=True, blank=True)
     
+    def get_job_status_display(self):
+        status_map = {
+            '0': 'รอรับซ่อม',
+            '1': 'กำลังดำเนินการ',
+            '11': 'รอจ่ายงาน',
+            '12': 'ตรวจรับงานแล้ว',
+            '13': 'รอใบเสนอราคา',
+            '2': 'ซ่อมเสร็จ',
+            '3': 'ยกเลิก',
+            '5': 'รออนุมัติ',
+            '6': 'รออะไหล่',
+            '7': 'ส่งซ่อมภายนอก'
+        }
+        return status_map.get(str(self.job_status), f"Unknown ({self.job_status})")
+    
     # ฟิลด์ที่คำนวณขึ้นมาเอง
     difficulty = models.IntegerField(null=True, blank=True)
     job_category_type = models.CharField(max_length=50, null=True, blank=True)

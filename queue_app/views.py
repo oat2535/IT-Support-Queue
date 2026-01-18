@@ -205,7 +205,7 @@ def call_next_queue(request):
                 if bms_job.job_status not in ['2', '12']:
                      return JsonResponse({
                          'success': False, 
-                         'error': f'ไม่สามารถกดเรียกคิวถัดไปได้ รบกวนปิดงานในระบบ BMS ก่อน (BMS Status: {bms_job.job_status})'
+                         'error': f'ไม่สามารถกดเรียกคิวถัดไปได้ รบกวนปิดงานในระบบ BMS ก่อน (BMS Status: {bms_job.get_job_status_display()})'
                      })
                      
             except JobsBms.DoesNotExist:
@@ -289,13 +289,33 @@ def finish_adhoc_queue(request):
         active_status = QueueStatus.objects.get(code='ACTIVE')
         done_status = QueueStatus.objects.get(code='DONE')
     except QueueStatus.DoesNotExist:
-        return redirect('dashboard')
+        return JsonResponse({'success': False, 'error': 'System statuses not defined'})
     
     # ดึงรายการ Ad-hoc ที่กำลัง Active อยู่ตอนนี้
     current_items = QueueItem.objects.filter(status=active_status, is_adhoc=1)
     
+    # 1. Validation Logic: ตรวจสอบสถานะ BMS ของรายการ Ad-hoc ก่อนปิด
+    for item in current_items:
+        if item.linked_job_no:
+            try:
+                bms_job = JobsBms.objects.get(jobno=item.linked_job_no)
+                if bms_job.job_status not in ['2', '12']:
+                     return JsonResponse({
+                         'success': False, 
+                         'error': f'ไม่สามารถปิดงานคิวแทรก (Ad-hoc) ได้ รบกวนปิดงานในระบบ BMS ก่อน (BMS Status: {bms_job.get_job_status_display()})'
+                     })
+            except JobsBms.DoesNotExist:
+                pass
+
+    # 2. ปิดงาน (ถ้าผ่าน Validation)
+    updated_count = 0
     for item in current_items:
         item.status = done_status
         item.save()
+        updated_count += 1
         
-    return redirect('dashboard')
+    if updated_count == 0 and not current_items.exists():
+         # กรณีไม่มีรายการ (อาจจะถูกปิดไปแล้ว)
+         return JsonResponse({'success': True})
+        
+    return JsonResponse({'success': True})

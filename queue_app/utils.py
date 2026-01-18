@@ -356,31 +356,35 @@ def update_queue_status_from_logic():
         QueueStatus.objects.filter(id=6).delete()
         
     except QueueStatus.DoesNotExist:
-        # ถ้าไม่มี ID 5 อาจจะยังไม่ได้ Seed Data หรือมีปัญหา
         pass
         
     # 2. Update Status เป็น 5 ถ้ามี outsource_date
     # เราเลือกเฉพาะรายการที่ยังไม่เสร็จ (Done) หรือ Active หรือ Waiting
-    # แต่ตาม Requirement "ถ้ารายการคิวใน table : job_bms field : outsource_date ไม่เท่ากับค่าว่าง ให้เปลี่ยน status_id ... = 5"
-    # ดังนั้นเราจะ query job ที่มี outsource_date
-    
-    jobs_with_outsource = JobsBms.objects.exclude(outsource_date__isnull=True).values_list('jobno', flat=True)
-    
-    # อัปเดต QueueItem ที่ Link กับ Job เหล่านี้
-    # โดยเราจะอัปเดตสถานะเป็น 5
-    # ข้อควรระวัง: ถ้างานนั้น Done ไปแล้วใน BMS (job_status=2) เราควรเปลี่ยนกลับมาเป็น 5 หรือไม่?
-    # ปกติถ้า Done แล้วคือจบ แต่ถ้า Outsource Date ยังค้างอยู่ อาจจะเป็น data เก่า
-    # แต่ถ้า User สั่งมาแบบนี้ แสดงว่า Outsource Date น่าจะเป็นตัวบ่งชี้สถานะปัจจุบันที่สำคัญกว่า
-    # อย่างไรก็ตาม เพื่อความปลอดภัย เราจะไม่ยุ่งกับรายการที่สถานะเป็น DONE (id=3 หรือ 4 แล้วแต่ config)
-    # สมมติว่า DONE คือ code='DONE'
+    # และต้องไม่เป็นสถานะ 5 อยู่แล้ว (เพื่อลด load update)
     
     try:
+        status_5 = QueueStatus.objects.get(id=5)
+        status_1 = QueueStatus.objects.get(id=1)
         done_status = QueueStatus.objects.get(code='DONE')
-        target_items = QueueItem.objects.filter(linked_job_no__in=jobs_with_outsource).exclude(status=done_status).exclude(status__id=5)
         
-        updated_count = target_items.update(status_id=5)
-        if updated_count > 0:
-            print(f"Updated {updated_count} items to Status 5 (Coordinating) due to outsource_date.")
-            
+        # 2.1 Case: มี outsource_date -> Set Status 5
+        jobs_with_outsource = JobsBms.objects.exclude(outsource_date__isnull=True).values_list('jobno', flat=True)
+        
+        target_items_to_5 = QueueItem.objects.filter(linked_job_no__in=jobs_with_outsource).exclude(status=done_status).exclude(status=status_5)
+        updated_count_5 = target_items_to_5.update(status=status_5)
+        
+        if updated_count_5 > 0:
+            print(f"Updated {updated_count_5} items to Status 5 (Coordinating) due to outsource_date present.")
+
+        # 2.2 Case: outsource_date เป็นค่าว่าง (ถูกลบออก) -> Revert Status 5 กลับเป็น 1 (Waiting)
+        # เฉพาะรายการที่เป็น Status 5 อยู่
+        jobs_without_outsource = JobsBms.objects.filter(outsource_date__isnull=True).values_list('jobno', flat=True)
+        
+        target_items_to_1 = QueueItem.objects.filter(linked_job_no__in=jobs_without_outsource, status=status_5)
+        updated_count_1 = target_items_to_1.update(status=status_1)
+        
+        if updated_count_1 > 0:
+            print(f"Updated {updated_count_1} items back to Status 1 (Waiting) due to outsource_date cleared.")
+
     except QueueStatus.DoesNotExist:
         pass
