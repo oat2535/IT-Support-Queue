@@ -48,8 +48,13 @@
             <div class="h3 mb-0 font-weight-bold" style="letter-spacing: 1px; padding-top: 8px;">IT Service Queue</div>
         </div>
         
-        <!-- Right: Clock -->
+        <!-- Right: Clock & Tools -->
         <div class="d-flex align-items-center">
+            {% if is_admin_computer %}
+            <button id="close-shift-btn" class="btn btn-danger btn-sm mr-3 font-weight-bold shadow-sm">
+                <i class="fas fa-store-slash mr-1"></i> ปิดกะ
+            </button>
+            {% endif %}
             <div class="h5 mb-0 font-weight-bold border-left pl-3 ml-2" style="border-color: rgba(255,255,255,0.3) !important;" id="clock">00:00:00</div>
         </div>
     </div>
@@ -79,6 +84,86 @@
         }
         setInterval(updateClock, 1000);
         updateClock();
+
+        // Check Access Rights from Django Context
+        var IS_ADMIN = "{{ is_admin_computer|yesno:'true,false' }}" === "true";
+        var IS_SHIFT_CLOSED = "{{ is_shift_closed|yesno:'true,false' }}" === "true";
+
+        // Close Shift Button Handler
+        $(document).ready(function() {
+            // Check State on Load (Server Side)
+            if (IS_SHIFT_CLOSED) {
+                showClosedPopup();
+            }
+
+            $('#close-shift-btn').on('click', function() {
+                toggleShift(true);
+            });
+        });
+
+        function toggleShift(shouldClose) {
+            $.ajax({
+                url: '{% url "toggle_shift_status" %}',
+                type: 'POST',
+                data: JSON.stringify({closed: shouldClose}),
+                contentType: 'application/json',
+                success: function(response) {
+                    if(response.success) {
+                        window.location.reload();
+                    } else {
+                        Swal.fire('Error', response.error, 'error');
+                    }
+                },
+                error: function() {
+                     Swal.fire('Error', 'Connection Error', 'error');
+                }
+            });
+        }
+
+        function showClosedPopup() {
+            // content
+            var contentHtml = 'เวลาให้บริการ 09.00 น. - 21.00 น.<br>หากมีเคสเร่งด่วนรบกวนติดต่อที่เบอร์ 99901';
+            
+            // Footer with Open Button for Admin
+            var footerContent = '';
+            if (IS_ADMIN) {
+                footerContent = '<button class="btn btn-success font-weight-bold py-2 px-4 shadow" onclick="openShift()"><i class="fas fa-store mr-2"></i>เปิดกะ (Open Shift)</button>';
+            }
+
+            Swal.fire({
+                title: 'ตอนนี้อยู่นอกเวลาการให้บริการของแผนก IT',
+                html: contentHtml,
+                icon: 'info',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                backdrop: 'rgba(0, 0, 0, 0.98)', // Very dark overlay
+                footer: footerContent,
+                customClass: {
+                    footer: 'border-0 pt-0 pb-4' // Styling cleanup
+                }
+            });
+        }
+
+        function openShift() {
+            Swal.fire({
+                title: 'ยืนยันเปิดกะ?',
+                text: "ต้องการเริ่มให้บริการตามปกติใช่หรือไม่",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#1cc88a',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ใช่, เปิดกะ',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    toggleShift(false);
+                } else {
+                    // Re-show the lock popup if cancelled
+                    showClosedPopup();
+                }
+            });
+        }
     </script>
     {% block extra_js %}{% endblock %}
 

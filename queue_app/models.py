@@ -1,6 +1,38 @@
 from django.db import models
 from django.utils import timezone
 
+class ShiftClosure(models.Model):
+    """
+    บันทึกการปิดกะ (ช่วงเวลาที่หยุดให้บริการ)
+    - สร้าง Record ใหม่เมื่อกด 'ปิดกะ' (closed_at)
+    - อัปเดต Record เดิมเมื่อกด 'เปิดกะ' (opened_at)
+    """
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closed_by = models.CharField(max_length=100, verbose_name="Closed By (Machine/IP)")
+    
+    opened_at = models.DateTimeField(null=True, blank=True)
+    opened_by = models.CharField(max_length=100, null=True, blank=True, verbose_name="Opened By (Machine/IP)")
+    
+    def save(self, *args, **kwargs):
+        # Strip microseconds from closed_at
+        if not self.closed_at:
+            self.closed_at = timezone.now().replace(microsecond=0)
+        else:
+            self.closed_at = self.closed_at.replace(microsecond=0)
+            
+        # Strip microseconds from opened_at if set
+        if self.opened_at:
+            self.opened_at = self.opened_at.replace(microsecond=0)
+            
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Closed: {self.closed_at} - Opened: {self.opened_at}"
+
+    class Meta:
+        ordering = ['-closed_at']
+
+
 class QueueStatus(models.Model):
     name = models.CharField(max_length=50)
     code = models.CharField(max_length=20, unique=True)

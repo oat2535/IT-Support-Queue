@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
-from .models import QueueItem, QueueStatus, JobsBms
+from .models import QueueItem, QueueStatus, JobsBms, ShiftClosure
 from .utils import sync_jobs_from_mssql 
 # การ Sync ข้อมูลถูกจัดการโดย management command แล้ว: python manage.py import_job_analysis
 from django.views.decorators.csrf import csrf_exempt
@@ -106,6 +106,10 @@ def dashboard(request):
         # กรณี resolve ไม่ได้ จะไม่ให้สิทธิ์ admin
         pass
 
+    # Check Global Shift Status (Using ShiftClosure model)
+    # If there is any record that is closed but NOT opened => Shift is Closed
+    is_shift_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
+    
     context = {
         'waiting_count': waiting_count,
         'active_count': active_count,
@@ -120,7 +124,9 @@ def dashboard(request):
         'is_admin_computer': is_admin_computer,
         'all_statuses': all_statuses,
         'all_statuses': all_statuses,
+        'all_statuses': all_statuses,
         'current_adhoc': current_adhoc,
+        'is_shift_closed': is_shift_closed,
     }
     
     return render(request, 'queue_app/dashboard.html', context)
@@ -319,3 +325,56 @@ def finish_adhoc_queue(request):
          return JsonResponse({'success': True})
         
     return JsonResponse({'success': True})
+
+@csrf_exempt
+def toggle_shift_status(request):
+    """
+    Toggle the global service suspension status.
+    POST data: { 'closed': true/false }
+    Logic:
+    - Close: Create NEW ShiftClosure record.
+    - Open: Update the LATEST active ShiftClosure record (opened_at=None).
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            should_close = data.get('closed')
+            
+            # Resolve Hostname logic
+            client_ip = request.META.get('REMOTE_ADDR')
+            hostname = client_ip 
+            try:
+                hostname, _, _ = socket.gethostbyaddr(client_ip)
+            except Exception:
+                pass
+
+            now = timezone.now().replace(microsecond=0)
+            
+            if should_close:
+                # Create NEW Record
+                ShiftClosure.objects.create(
+                    closed_by=hostname
+                    # closed_at is auto_now_add
+                )
+                is_closed = True
+            else:
+                # Find the latest open closure (where opened_at is Null)
+                active_closures = ShiftClosure.objects.filter(opened_at__isnull=True)
+                if active_closures.exists():
+                    # Update all active closures (should ideally be just one, but safety first)
+                    active_closures.update(
+                        opened_at=now,
+                        opened_by=hostname
+                    )
+                is_closed = False
+            
+            return JsonResponse({
+                'success': True, 
+                'is_closed': is_closed,
+                'timestamp': now.strftime('%Y-%m-%d %H:%M:%S')
+            })
+            
+        except Exception as e:
+             return JsonResponse({'success': False, 'error': str(e)})
+             
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})

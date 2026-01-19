@@ -10,4 +10,5 @@ urlpatterns = [
     path('toggle-urgent/', views.toggle_urgent_status, name='toggle_urgent'),
     path('insert-queue/', views.insert_queue_adhoc, name='insert_queue'),
     path('finish-adhoc/', views.finish_adhoc_queue, name='finish_adhoc'),
+    path('toggle-shift-status/', views.toggle_shift_status, name='toggle_shift_status'),
 ]
