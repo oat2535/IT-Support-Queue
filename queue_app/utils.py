@@ -1,6 +1,8 @@
 import pyodbc
 from .models import JobsBms
 from datetime import datetime
+import socket
+from functools import lru_cache
 
 def sync_jobs_from_mssql():
     """
@@ -388,3 +390,15 @@ def update_queue_status_from_logic():
 
     except QueueStatus.DoesNotExist:
         pass
+
+@lru_cache(maxsize=128)
+def get_hostname_from_ip(ip_address):
+    """
+    Resolve hostname from IP address with caching to prevent slow lookups.
+    Returns hostname if resolved, otherwise returns None.
+    """
+    try:
+        hostname, _, _ = socket.gethostbyaddr(ip_address)
+        return hostname
+    except Exception:
+        return None

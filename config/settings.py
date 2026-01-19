@@ -145,9 +145,11 @@ STATICFILES_DIRS = [
 ]
 
 # สำหรับ HTTPS
-CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com']
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+# สำหรับ HTTPS (Local Dev: Disable Secure Cookies to allow IP access without SSL)
+CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com', 'http://192.168.1.33']
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 # ประเภทของ Auto-field (Primary Key) เริ่มต้น
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

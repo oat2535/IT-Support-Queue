@@ -97,7 +97,20 @@
             }
 
             $('#close-shift-btn').on('click', function() {
-                toggleShift(true);
+                Swal.fire({
+                    title: 'ยืนยันปิดกะ?',
+                    text: "คุณต้องการปิดระบบให้บริการใช่หรือไม่ หน้าจอจะถูก Freeze ทันที",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e74a3b', // red
+                    cancelButtonColor: '#858796', // secondary
+                    confirmButtonText: 'ใช่, ปิดกะเลย',
+                    cancelButtonText: 'ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        toggleShift(true);
+                    }
+                });
             });
         });
 

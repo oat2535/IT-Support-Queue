@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
 from .models import QueueItem, QueueStatus, JobsBms, ShiftClosure
-from .utils import sync_jobs_from_mssql 
+from .utils import sync_jobs_from_mssql, get_hostname_from_ip 
 # การ Sync ข้อมูลถูกจัดการโดย management command แล้ว: python manage.py import_job_analysis
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
@@ -86,28 +86,45 @@ def dashboard(request):
         except Exception as e:
             print(f"Error calculating ranks: {e}")
 
-    # ตรวจสอบชื่อเครื่อง
+    # ตรวจสอบชื่อเครื่อง (Optimized with Cache)
     is_admin_computer = False
     client_ip = request.META.get('REMOTE_ADDR')
-    try:
-        # พยายาม resolve hostname
-        hostname, alias, iplist = socket.gethostbyaddr(client_ip)
-        print(f"DEBUG: Client IP={client_ip}, Hostname={hostname}") # Debugging
-        
+    
+    hostname = get_hostname_from_ip(client_ip)
+    # print(f"DEBUG: Client IP={client_ip}, Hostname={hostname}")
+    
+    if hostname:
+        current_hostname = hostname.upper()
         # รายชื่อเครื่องที่อนุญาต (ควรทำเป็น List ไว้)
         admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24']
 
         # ใช้ any() เพื่อเช็คว่ามีชื่อใดชื่อหนึ่งใน admin_hosts ปรากฏอยู่ใน hostname หรือไม่
-        current_hostname = hostname.upper()
-        if any(admin_host in current_hostname for admin_host in admin_hosts) or client_ip == '127.0.0.1':
+        if any(admin_host in current_hostname for admin_host in admin_hosts):
             is_admin_computer = True
-    except Exception as e:
-        print(f"DEBUG: Could not resolve hostname for {client_ip}: {e}")
-        # กรณี resolve ไม่ได้ จะไม่ให้สิทธิ์ admin
-        pass
+            
+    if client_ip == '127.0.0.1':
+        is_admin_computer = True
 
     # Check Global Shift Status (Using ShiftClosure model)
-    # If there is any record that is closed but NOT opened => Shift is Closed
+    # Automatic Close Logic: If time >= 21:00 and not closed -> Close it (unless opened AFTER 21:00 today)
+    now = timezone.now()
+    if now.hour >= 21:
+        # Check if currently closed
+        is_currently_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
+        
+        if not is_currently_closed:
+             # Check if it was opened AFTER 21:00 today (Overtime / Manual Override)
+             today_21pm = now.replace(hour=21, minute=0, second=0, microsecond=0)
+             has_overtime_open = ShiftClosure.objects.filter(opened_at__gte=today_21pm).exists()
+             
+             if not has_overtime_open:
+                 # Auto Close
+                 ShiftClosure.objects.create(
+                     closed_by='System (Auto)'
+                 )
+                 print(f"DEBUG: System Auto-Closed Shift at {now}")
+
+    # Re-check status
     is_shift_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
     
     context = {
@@ -340,13 +357,12 @@ def toggle_shift_status(request):
             data = json.loads(request.body)
             should_close = data.get('closed')
             
-            # Resolve Hostname logic
+            # Resolve Hostname logic (Optimized)
             client_ip = request.META.get('REMOTE_ADDR')
-            hostname = client_ip 
-            try:
-                hostname, _, _ = socket.gethostbyaddr(client_ip)
-            except Exception:
-                pass
+            hostname = get_hostname_from_ip(client_ip)
+            
+            if not hostname:
+                hostname = client_ip # Default to IP if validation fails
 
             now = timezone.now().replace(microsecond=0)
             
