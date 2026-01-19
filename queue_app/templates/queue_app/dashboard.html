@@ -46,7 +46,9 @@
         </div>
 
         <!-- Coordinating / Waiting Parts -->
+        <!-- Coordinating / Waiting Parts -->
         <div class="col-xl">
+            <!-- ลิงก์ไปหน้า Pending (รอประสานงาน/อะไหล่) -->
             <a href="?status=pending" class="text-decoration-none">
                 <div class="card bg-primary text-white status-card-hover shadow h-100 py-2" style="cursor: pointer;">
                     <div class="card-body">
@@ -78,8 +80,10 @@
                     <p class="mb-2 text-gray-500">หมายเลขคิวปัจจุบัน</p>
                     
                     {% if current_queue %}
+                        <!-- แสดงเลขคิวและชื่อ (ขนาดใหญ่) -->
                         <div class="queue-number-large text-primary">{{ current_queue.queue_number }}</div>
                         <h2 class="font-weight-bold text-gray-800">{{ current_queue.user_name }}</h2>
+                        <!-- Tooltip แสดงรายละเอียดงานเต็มๆ -->
                         <p class="text-muted mb-2">{{ current_queue.user_department }} - <span data-toggle="tooltip" data-placement="top" data-html="true" title="{{ current_queue.issue_description|linebreaksbr }}">{{ current_queue.issue_description|truncatechars:50 }}</span></p>
                         <div class="mb-4">
                             <span class="badge badge-info badge-pill px-4 py-2" style="font-size: 1.2rem;">กำลังดำเนินการ</span>
@@ -130,6 +134,7 @@
                          <span class="badge badge-warning badge-pill px-4 py-2 text-white" style="font-size: 1.2rem;">กำลังดำเนินการ (แทรก)</span>
                          
                          {% if is_admin_computer or current_adhoc.comment or current_adhoc.bms_note %}
+                            <!-- ปุ่มบันทึกหมายเหตุ (Note) -->
                             <button class="btn btn-sm {% if current_adhoc.comment or current_adhoc.bms_note %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
                                     onclick="openDescModal('{{ current_adhoc.id }}', '{% if current_adhoc.comment %}{{ current_adhoc.comment|escapejs }}{% endif %}', '{{ current_adhoc.status.id }}', '{{ current_adhoc.bms_note|escapejs }}')"
                                     title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true" style="width: 32px; height: 32px;">
@@ -160,6 +165,7 @@
                     <div class="d-flex align-items-center">
                         <form class="form-inline mr-2" method="GET" action="#queue-list-section">
                             {% if active_filter %}
+                            <!-- คงค่า active_filter ไว้เมื่อ search -->
                             <input type="hidden" name="status" value="{{ active_filter }}">
                             {% endif %}
                             <div class="input-group">
@@ -424,6 +430,11 @@
         var IS_ADMIN = "{{ is_admin_computer|yesno:'true,false' }}" === "true";
 
         function openDescModal(id, comment, statusId, bmsNote) {
+            /**
+             * เปิด Modal บันทึกหมายเหตุ
+             * - ถ้าไม่ใช่ Adminจะเป็น Read-only
+             * - แสดง bmsNote (ถ้ามี)
+             */
             $('#modal-job-id').val(id);
             $('#modal-desc-text').val(comment);
             $('#modal-bms-note').val(bmsNote);
@@ -444,6 +455,9 @@
         }
 
         function saveDescription() {
+            /**
+             * บันทึกหมายเหตุ (AJAX)
+             */
             var id = $('#modal-job-id').val();
             var comment = $('#modal-desc-text').val();
             
@@ -556,6 +570,10 @@
         }
         
         function toggleAdminMenu() {
+            /**
+             * จัดการปุ่ม Menu Admin (FAB) ที่มุมขวาล่าง
+             * สลับไอคอนระหว่าง ไขควง <-> กากบาท
+             */
             var $menu = $('#admin-menu');
             var $fab = $('#admin-fab');
             var $icon = $('#admin-fab-icon');
@@ -632,7 +650,7 @@
         })
 
         // Auto Refresh every 1 minute (60,000 ms)
-        // Only refresh if no modal is open to avoid interrupting user input
+        // Check: ห้าม Refresh ถ้า Modal เปิดอยู่ (เดี๋ยว User พิมพ์ค้างไว้หาย)
         setInterval(function() {
             if (!$('.modal').hasClass('show')) {
                 window.location.reload();

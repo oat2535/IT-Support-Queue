@@ -125,18 +125,24 @@ def sync_jobs_from_mssql():
     return count
 
 def get_mssql_connection():
+    """
+    Function: เชื่อมต่อฐานข้อมูล MSSQL
+    หน้าที่: สร้าง Connection String เพื่อเชื่อมต่อไปยัง Server BMS (ระบบแจ้งซ่อมเก่า)
+    """
     # รายละเอียดการเชื่อมต่อ MSSQL
     server = '192.168.99.224' 
     database = 'BMSDB' 
     username = 'kanchana_a' 
     password = 'Bms@2025' 
     
+    # ตรวจสอบ Driver ODBC ในเครื่อง
     drivers = [driver for driver in pyodbc.drivers() if 'SQL Server' in driver]
     if not drivers:
         print("No SQL Server ODBC drivers found!")
         return None
     driver = drivers[0]
     
+    # สร้าง Connection String (รองรับ TrustServerCertificate สำหรับ Self-signed SSL)
     conn_str = f'DRIVER={{{driver}}};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes'
     try:
         return pyodbc.connect(conn_str)
@@ -145,7 +151,12 @@ def get_mssql_connection():
         return None
 
 def update_or_create_job(data):
-    """ Helper function to update or create a single Job record """
+    """ 
+    Helper function to update or create a single Job record 
+    หน้าที่: อัปเดตข้อมูล JobsBms หรือสร้างใหม่ถ้ายังไม่มี (Upsert)
+    - data['jobno'] เป็น Key ในการค้นหา
+    - ตัด microseconds ออกจากวันที่เพื่อความสะอาดของข้อมูล
+    """
     JobsBms.objects.update_or_create(
         jobno=data['jobno'],
         defaults={
@@ -179,6 +190,10 @@ def sync_existing_jobs_updates(cursor, columns_template=None):
     """
     Sync รอบที่ 2: ดึงข้อมูลของ Job ที่มีอยู่แล้วใน Local DB ทั้งหมด
     กลับไปเช็คที่ MSSQL ว่ามีการอัปเดตหรือไม่ (เช่น เปลี่ยนสถานะเป็น Closed)
+    Logic:
+    1. ดึง ID (jobno) ทั้งหมดจาก Local DB
+    2. แบ่ง ID เป็น Chunk (ชุดละ 50) เพื่อไม่ให้ Query ยาวเกินไป
+    3. สร้าง SQL Query โดยใช้ WHERE IN (...) เพื่อดึงข้อมูลอัปเดตเฉพาะ ID เหล่านั้น
     """
     updated_count = 0
     
@@ -264,7 +279,7 @@ def sync_existing_jobs_updates(cursor, columns_template=None):
             for row in rows:
                 data = dict(zip(columns, row))
                 
-                # Check dept_tech condition: Must start with 'T'
+                # Check dept_tech condition: Must start with 'T' (เฉพาะแผนก Tech)
                 dept_tech = data.get('dept_tech', '')
                 if dept_tech and not dept_tech.startswith('T'):
                     from .models import QueueItem
@@ -283,33 +298,32 @@ def sync_existing_jobs_updates(cursor, columns_template=None):
 
 def sync_to_queue_items():
     """
-    Sync ข้อมูลจาก JobsBms ไปยัง QueueItem โดยเช็คจาก linked_job_no
+    Sync ข้อมูลจาก JobsBms ไปยัง QueueItem (ตารางคิว)
+    - สร้าง QueueItem เฉพาะรายการใหม่ที่ยังไม่เคยมี (เช็คจาก linked_job_no)
+    - กำหนดเลขคิวรันต่อเนื่อง (IT-XXXX)
+    - ตั้งสถานะเริ่มต้นเป็น Waiting
     """
     from .models import QueueItem, QueueStatus, JobsBms
     
-    
     # ตรวจสอบว่ามีสถานะเริ่มต้น 'Waiting' หรือยัง
-    # ผู้ใช้งานต้องการให้ default status_id = 1
     try:
         waiting_status = QueueStatus.objects.get(id=1)
     except QueueStatus.DoesNotExist:
-        # กรณีที่ไม่มี ID 1 (ไม่น่าเกิดขึ้นถ้า Seed ไว้แล้ว แต่กันเหนียว)
+        # กรณีที่ไม่มี ID 1 (Seed ไว้แล้ว แต่กันเหนียว)
         waiting_status, _ = QueueStatus.objects.get_or_create(
             id=1,
             defaults={'code': 'waiting', 'name': 'Waiting', 'color': 'warning'}
         )
     
     # ดึง Job ที่ยังไม่เคย Sync โดยเรียงตามวันที่แจ้งซ่อม (req_date)
-    # เราใช้ linked_job_no เพื่อตรวจสอบว่าเคยมีแล้วหรือยัง
+    # เราใช้ linked_job_no เพื่อตรวจสอบว่าเคยมีแล้วหรือยังใน QueueItem
     existing_linked_ids = QueueItem.objects.filter(linked_job_no__isnull=False).values_list('linked_job_no', flat=True)
     
     jobs_to_sync = JobsBms.objects.exclude(jobno__in=existing_linked_ids).order_by('req_date')
     
     for job in jobs_to_sync:
-        # สร้างเลขคิว: IT-{running_number}
-        # เราต้องหาเลขคิวล่าสุดแล้วบวกเพิ่มไปเรื่อยๆ
-        # (Requirement บอกว่ารัน running number ตามวันที่ req_date)
-        # ถ้าเรา append ไปเรื่อยๆ มันก็จะ work สำหรับรายการใหม่
+        # Generate Queue Number: IT-{running_number}
+        # คำนวณเลขล่าสุด + 1
         
         last_item = QueueItem.objects.all().order_by('id').last()
         if last_item and last_item.queue_number.startswith('IT-'):
@@ -323,7 +337,7 @@ def sync_to_queue_items():
             
         queue_number = f"IT-{new_num:04d}"
         
-        # ตรวจสอบว่าเลขคิวซ้ำหรือไม่กันเหนียว (แม้จะเช็ค last_item มาแล้ว แต่อาจมี concurrency ได้ แม้ traffic จะไม่เยอะ)
+        # ป้องกันเลขซ้ำ (Concurrency Safety Check)
         while QueueItem.objects.filter(queue_number=queue_number).exists():
             new_num += 1
             queue_number = f"IT-{new_num:04d}"
@@ -394,8 +408,10 @@ def update_queue_status_from_logic():
 @lru_cache(maxsize=128)
 def get_hostname_from_ip(ip_address):
     """
-    Resolve hostname from IP address with caching to prevent slow lookups.
-    Returns hostname if resolved, otherwise returns None.
+    Function: Resolve Hostname from IP (with Caching)
+    หน้าที่: แปลง IP (เช่น 192.168.1.33) เป็นชื่อเครื่อง (Hostname)
+    - ใช้ @lru_cache เพื่อเก็บค่าที่เคยหาแล้วไว้ใน Memory ไม่ต้องหาใหม่ทุกครั้ง
+    - ช่วยลดเวลาโหลดหน้าเว็บกรณี Network ช้า
     """
     try:
         hostname, _, _ = socket.gethostbyaddr(ip_address)

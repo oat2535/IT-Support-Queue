@@ -3,14 +3,18 @@ from django.utils import timezone
 
 class ShiftClosure(models.Model):
     """
-    บันทึกการปิดกะ (ช่วงเวลาที่หยุดให้บริการ)
-    - สร้าง Record ใหม่เมื่อกด 'ปิดกะ' (closed_at)
-    - อัปเดต Record เดิมเมื่อกด 'เปิดกะ' (opened_at)
+    Model: ShiftClosure
+    หน้าที่: บันทึกประวัติการปิด-เปิดกะ (Shift) ของเจ้าหน้าที่ IT
+    ถูกเรียกใช้เมื่อ: Admin กดปุ่ม "ปิดกะ" หรือ "เปิดกะ" บนหน้า Dashboard
     """
+    # วันเวลาที่กดปิดกะ
     closed_at = models.DateTimeField(null=True, blank=True)
+    # ชื่อเครื่อง (Hostname/IP) ของคนที่กดปิดกะ
     closed_by = models.CharField(max_length=100, verbose_name="Closed By (Machine/IP)")
     
+    # วันเวลาที่กดเปิดกะ (ถ้ายังเป็น Null แสดงว่ากะยังปิดอยู่)
     opened_at = models.DateTimeField(null=True, blank=True)
+    # ชื่อเครื่อง (Hostname/IP) ของคนที่กดเปิดกะ
     opened_by = models.CharField(max_length=100, null=True, blank=True, verbose_name="Opened By (Machine/IP)")
     
     def save(self, *args, **kwargs):
@@ -34,25 +38,34 @@ class ShiftClosure(models.Model):
 
 
 class QueueStatus(models.Model):
-    name = models.CharField(max_length=50)
-    code = models.CharField(max_length=20, unique=True)
-    color = models.CharField(max_length=20, default='secondary') # primary, success, warning, etc. (สีปุ่มที่ใช้ในหน้าเว็บ)
+    """
+    Model: QueueStatus
+    หน้าที่: เก็บสถานะต่างๆ ของคิวงาน เช่น Waiting, Active, Done
+    """
+    name = models.CharField(max_length=50) # ชื่อสถานะ (ภาษาไทย/อังกฤษ)
+    code = models.CharField(max_length=20, unique=True) # รหัสสถานะ (ภาษาอังกฤษตัวใหญ่ เช่น WAITING)
+    color = models.CharField(max_length=20, default='secondary') # สีของปุ่ม/Badge ในหน้าเว็บ (ใช้ Class ของ Bootstrap เช่น primary, success, warning)
 
     def __str__(self):
         return self.name
 
 class QueueItem(models.Model):
-    queue_number = models.CharField(max_length=20, unique=True)
-    user_name = models.CharField(max_length=100)
-    user_department = models.CharField(max_length=100)
-    issue_description = models.TextField()
-    comment = models.TextField(null=True, blank=True)
-    is_urgent = models.IntegerField(default=0) # สถานะเร่งด่วน (0=ปกติ, 1=เร่งด่วน)
-    created_at = models.DateTimeField(default=timezone.now)
+    """
+    Model: QueueItem
+    หน้าที่: เก็บข้อมูลคิวรับบริการแต่ละรายการ (ตารางหลักของระบบคิว)
+    """
+    queue_number = models.CharField(max_length=20, unique=True) # เลขคิว เช่น IT-0001
+    user_name = models.CharField(max_length=100) # ชื่อผู้มาติดต่อ
+    user_department = models.CharField(max_length=100) # แผนกผู้มาติดต่อ
+    issue_description = models.TextField() # รายละเอียดงาน/ปัญหา
+    comment = models.TextField(null=True, blank=True) # หมายเหตุเพิ่มเติม
+    is_urgent = models.IntegerField(default=0) # สถานะเร่งด่วน: 0=ปกติ, 1=เร่งด่วน (แสดงแถบสีแดง)
+    created_at = models.DateTimeField(default=timezone.now) # วันเวลาที่สร้างคิว
     
-    # เชื่อมโยงกับ JobsBms (ระบบงานซ่อมเก่า)
+    # เชื่อมโยงกับ JobsBms (ระบบงานซ่อมเก่า) - ใช้เก็บ jobno จาก MSSQL
     linked_job_no = models.IntegerField(null=True, blank=True, unique=True, db_index=True)
     
+    # สถานะปัจจุบันของคิว (Relation ไปหา QueueStatus)
     status = models.ForeignKey(
         QueueStatus, 
         on_delete=models.SET_NULL, 
@@ -61,10 +74,10 @@ class QueueItem(models.Model):
         related_name='items'
     )
     
-    # วันที่กดเรียกคิว (status -> 2 / ACTIVE)
+    # วันเวลาที่กดเรียกคิว (เปลี่ยนสถานะเป็น ACTIVE)
     call_queue_date = models.DateTimeField(null=True, blank=True)
     
-    # เป็นคิวที่ถูกแทรก (Ad-hoc) 0=Normal, 1=Adhoc
+    # เป็นคิวที่ถูกแทรก (Ad-hoc) หรือไม่: 0=คิวปกติ (Normal), 1=คิวแทรก (Adhoc)
     is_adhoc = models.IntegerField(default=0)
 
     def save(self, *args, **kwargs):
@@ -103,28 +116,33 @@ class QueueItem(models.Model):
         ordering = ['created_at']
 
 class JobsBms(models.Model):
-    jobno = models.IntegerField(unique=True)
-    catagory = models.CharField(max_length=50, null=True, blank=True)
-    description = models.TextField(null=True, blank=True)
-    dept_tech = models.CharField(max_length=50, null=True, blank=True)
+    """
+    Model: JobsBms
+    หน้าที่: เก็บข้อมูลงานซ่อมที่ Sync มาจากฐานข้อมูล MSSQL (ระบบเก่า)
+    ข้อมูลในตารางนี้จะถูกอ่านมาสร้างเป็น QueueItem
+    """
+    jobno = models.IntegerField(unique=True) # เลขที่ใบงาน (PK จากระบบเก่า)
+    catagory = models.CharField(max_length=50, null=True, blank=True) # หมวดหมู่งาน
+    description = models.TextField(null=True, blank=True) # รายละเอียดอาการเสีย
+    dept_tech = models.CharField(max_length=50, null=True, blank=True) # แผนกช่าง (Tech Department)
     name = models.CharField(max_length=100, null=True, blank=True, verbose_name="Employee Name")
     jobdate = models.DateTimeField(null=True, blank=True)
-    assign_date = models.DateTimeField(null=True, blank=True)
-    arrive_date = models.DateTimeField(null=True, blank=True)
-    req_date = models.DateTimeField(null=True, blank=True)
-    caller = models.CharField(max_length=100, null=True, blank=True)
+    assign_date = models.DateTimeField(null=True, blank=True) # วันที่มอบหมายงาน
+    arrive_date = models.DateTimeField(null=True, blank=True) # วันที่ไปถึงหน้างาน
+    req_date = models.DateTimeField(null=True, blank=True) # วันที่แจ้งซ่อม (Request Date)
+    caller = models.CharField(max_length=100, null=True, blank=True) # ผู้แจ้งปัญหา
     sap_code = models.CharField(max_length=50, null=True, blank=True)
     aname = models.CharField(max_length=255, null=True, blank=True)
-    note = models.TextField(null=True, blank=True)
-    act_dstart = models.DateTimeField(null=True, blank=True)
-    act_dfin = models.DateTimeField(null=True, blank=True)
-    job_status = models.CharField(max_length=10, null=True, blank=True)
+    note = models.TextField(null=True, blank=True) # หมายเหตุช่าง
+    act_dstart = models.DateTimeField(null=True, blank=True) # วันที่เริ่มซ่อมจริง
+    act_dfin = models.DateTimeField(null=True, blank=True) # วันที่ซ่อมเสร็จจริง
+    job_status = models.CharField(max_length=10, null=True, blank=True) # รหัสสถานะงาน (1, 2, 11, etc.)
     return_date = models.DateTimeField(null=True, blank=True)
     enterdate = models.DateTimeField(null=True, blank=True)
     enterby = models.CharField(max_length=100, null=True, blank=True)
-    outsource_date = models.DateTimeField(null=True, blank=True)
+    outsource_date = models.DateTimeField(null=True, blank=True) # วันที่ส่งซ่อมภายนอก
     
-    # ฟิลด์ใหม่จากการ join ตารางแผนก
+    # ฟิลด์ใหม่จากการ join ตารางแผนก (เพื่อแสดงชื่อเต็มของแผนก)
     abb_desc = models.CharField(max_length=100, null=True, blank=True)
     descriptions = models.TextField(null=True, blank=True)
     

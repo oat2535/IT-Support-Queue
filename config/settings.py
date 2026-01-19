@@ -29,7 +29,6 @@ ALLOWED_HOSTS = ['*']
 
 
 # การกำหนด Application ในระบบ
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -37,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # แอปพลิเคชันของเรา
     'queue_app',
 ]
 
@@ -140,16 +140,17 @@ USE_TZ = False
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+# ตำแหน่งเก็บไฟล์ Static ของโปรเจค
 STATICFILES_DIRS = [
     BASE_DIR / "startbootstrap-sb-admin-2-gh-pages",
 ]
 
 # สำหรับ HTTPS
-# สำหรับ HTTPS (Local Dev: Disable Secure Cookies to allow IP access without SSL)
+# หมายเหตุ: ใน Local Development เราปิด Secure Cookies เพื่อให้ใช้งานผ่าน IP ได้สะดวก
 CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com', 'http://192.168.1.33']
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+SESSION_COOKIE_SECURE = False # ควรเป็น True บน Production (HTTPS)
+CSRF_COOKIE_SECURE = False # ควรเป็น True บน Production (HTTPS)
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None # ปิดเพื่อลด Warning ใน Local Dev (IP Access)
 
 # ประเภทของ Auto-field (Primary Key) เริ่มต้น
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

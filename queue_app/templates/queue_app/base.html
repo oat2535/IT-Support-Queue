@@ -42,19 +42,22 @@
 
     <!-- Header -->
     <div class="d-flex align-items-center justify-content-between px-4 py-3 bg-header shadow mb-4">
-        <!-- Left: Logo & Title -->
+        <!-- ฝั่งซ้าย: โลโก้และชื่อโปรแกรม -->
         <div class="d-flex align-items-center">
             <img src="{% static 'img/TLPHLogo.png' %}" alt="Logo" style="height: 50px;" class="mr-3">
             <div class="h3 mb-0 font-weight-bold" style="letter-spacing: 1px; padding-top: 8px;">IT Service Queue</div>
         </div>
         
-        <!-- Right: Clock & Tools -->
+        <!-- ฝั่งขวา: นาฬิกาและปุ่มจัดการกะ -->
         <div class="d-flex align-items-center">
             {% if is_admin_computer %}
+            <!-- ปุ่มปิดกะ (แสดงเฉพาะ Admin) -->
             <button id="close-shift-btn" class="btn btn-danger btn-sm mr-3 font-weight-bold shadow-sm">
                 <i class="fas fa-store-slash mr-1"></i> ปิดกะ
             </button>
             {% endif %}
+            
+            <!-- นาฬิกาดิจิตอล -->
             <div class="h5 mb-0 font-weight-bold border-left pl-3 ml-2" style="border-color: rgba(255,255,255,0.3) !important;" id="clock">00:00:00</div>
         </div>
     </div>
@@ -86,16 +89,18 @@
         updateClock();
 
         // Check Access Rights from Django Context
+        // Check Access Rights from Django Context (รับค่าจาก Server)
         var IS_ADMIN = "{{ is_admin_computer|yesno:'true,false' }}" === "true";
         var IS_SHIFT_CLOSED = "{{ is_shift_closed|yesno:'true,false' }}" === "true";
 
         // Close Shift Button Handler
         $(document).ready(function() {
-            // Check State on Load (Server Side)
+            // Check State on Load: ถ้าปิดกะอยู่ ให้แสดง Popup ทันที
             if (IS_SHIFT_CLOSED) {
                 showClosedPopup();
             }
 
+            // Event Listener สำหรับปุ่มปิดกะ
             $('#close-shift-btn').on('click', function() {
                 Swal.fire({
                     title: 'ยืนยันปิดกะ?',
@@ -108,13 +113,16 @@
                     cancelButtonText: 'ยกเลิก'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        toggleShift(true);
+                        toggleShift(true); // เรียก Ajax ปิดกะ
                     }
                 });
             });
         });
 
         function toggleShift(shouldClose) {
+            /** 
+             * ฟังก์ชันยิง Ajax ไปที่ Server เพื่อเปลี่ยนสถานะ Shift 
+             */
             $.ajax({
                 url: '{% url "toggle_shift_status" %}',
                 type: 'POST',
@@ -122,7 +130,7 @@
                 contentType: 'application/json',
                 success: function(response) {
                     if(response.success) {
-                        window.location.reload();
+                        window.location.reload(); // รีโหลดหน้าเพื่อ update state
                     } else {
                         Swal.fire('Error', response.error, 'error');
                     }
@@ -134,10 +142,16 @@
         }
 
         function showClosedPopup() {
-            // content
+            /**
+             * แสดง Popup ปิดกะ (Lock Screen)
+             * - ห้ามกดปิด (allowOutsideClick: false)
+             * - Admin จะเห็นปุ่ม "เปิดกะ" ที่ Footer
+             */
+            
+            // Content ข้อความที่จะแสดง
             var contentHtml = 'เวลาให้บริการ 09.00 น. - 21.00 น.<br>หากมีเคสเร่งด่วนรบกวนติดต่อที่เบอร์ 99901';
             
-            // Footer with Open Button for Admin
+            // Footer: ปุ่มเปิดกะสำหรับ Admin เท่านั้น
             var footerContent = '';
             if (IS_ADMIN) {
                 footerContent = '<button class="btn btn-success font-weight-bold py-2 px-4 shadow" onclick="openShift()"><i class="fas fa-store mr-2"></i>เปิดกะ (Open Shift)</button>';
@@ -150,10 +164,10 @@
                 allowOutsideClick: false,
                 allowEscapeKey: false,
                 showConfirmButton: false,
-                backdrop: 'rgba(0, 0, 0, 0.98)', // Very dark overlay
+                backdrop: 'rgba(0, 0, 0, 0.98)', // make background dark
                 footer: footerContent,
                 customClass: {
-                    footer: 'border-0 pt-0 pb-4' // Styling cleanup
+                    footer: 'border-0 pt-0 pb-4'
                 }
             });
         }

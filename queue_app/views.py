@@ -11,13 +11,18 @@ import json
 import socket
 
 def dashboard(request):
-    # เราใช้ management command ในการ sync ข้อมูลแล้ว
-    # sync_jobs_from_mssql() ถูกนำออกจากตรงนี้เพื่อเพิ่มประสิทธิภาพการทำงาน
-    
-    # query ข้อมูลจาก QueueItem แทน JobsBms
+    """
+    View Function: dashboard
+    หน้าที่: แสดงหน้าจอหลักของระบบคิว (Dashboard)
+    - แสดงจำนวนคิวแต่ละสถานะ
+    - แสดงรายการคิวที่รอ (Waiting) และกำลังดำเนินการ (Active)
+    - ตรวจสอบสิทธิ์ Admin (Based on Hostname/IP)
+    - ตรวจสอบเวลาปิดกะอัตโนมัติ (Auto-close Logic)
+    """
+    # query ข้อมูลจาก QueueItem
     items = QueueItem.objects.all()
     
-    # นับจำนวนตามสถานะ
+    # นับจำนวนตามสถานะต่างๆ เพื่อแสดงบนการ์ดด้านบน
     waiting_count = items.filter(status__code='WAITING').count()
     active_count = items.filter(status__code='ACTIVE').count()
     done_count = items.filter(status__code='DONE').count()
@@ -28,15 +33,15 @@ def dashboard(request):
     target_codes = ['WAITING', 'COORDINATING', 'WAITING_PARTS']
     all_statuses = QueueStatus.objects.filter(code__in=target_codes).order_by('id')
     
-    # คิวที่กำลังเรียกอยู่ปัจจุบัน (Normal)
+    # คิวที่กำลังเรียกอยู่ปัจจุบัน (Normal Queue)
     current_queue = items.filter(status__code='ACTIVE', is_adhoc=0).order_by('created_at').first()
     
-    # คิว Ad-hoc ที่กำลัง Active
+    # คิวแทรก (Ad-hoc) ที่กำลัง Active (ถ้ามี จะแสดงแทรกขึ้นมา)
     current_adhoc = items.filter(status__code='ACTIVE', is_adhoc=1).order_by('created_at').first()
     
-    # Logic การกรองข้อมูล
-    status_filter = request.GET.get('status', 'waiting') # เก็บ URL param เป็นตัวเล็กเพื่อความสวยงาม แต่จะ map เป็นตัวใหญ่ในการ query
-    search_query = request.GET.get('q', '')
+    # --- Logic การกรองข้อมูล (Filter) ---
+    status_filter = request.GET.get('status', 'waiting') # รับค่าจาก URL parameter
+    search_query = request.GET.get('q', '') # รับค่าค้นหา
     
     if status_filter == 'active':
         queue_list = items.filter(status__code='ACTIVE').order_by('created_at')
@@ -48,13 +53,14 @@ def dashboard(request):
         queue_list = items.filter(status__code__in=['COORDINATING', 'WAITING_PARTS']).order_by('created_at')
         list_title = "รายการที่อยู่ระหว่างประสานงานและรออะไหล่"
     elif status_filter == 'waiting':
+        # เรียงตามความเร่งด่วน (urgent) ก่อน แล้วค่อยตามเลขคิว
         queue_list = items.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number')
         list_title = "รายการที่รอคิว (Waiting)"
     else:
         queue_list = items.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number')
         list_title = "รายการที่รอคิว (Waiting)"
 
-    # Logic การค้นหา
+    # --- Logic การค้นหา (Search) ---
     if search_query:
         queue_list = queue_list.filter(
             Q(issue_description__icontains=search_query) | 
@@ -62,7 +68,7 @@ def dashboard(request):
             Q(queue_number__icontains=search_query)
         )
 
-    # Logic การแบ่งหน้า (Pagination)
+    # --- Logic การแบ่งหน้า (Pagination) ---
     paginator = Paginator(queue_list, 5) # แสดง 5 รายการต่อหน้า
     page = request.GET.get('page')
     try:
@@ -72,59 +78,56 @@ def dashboard(request):
     except EmptyPage:
         queue_list = paginator.page(paginator.num_pages)
 
-    # Inject Rank for Waiting List (Fix: Search resets rank issue)
+    # --- Logic การจัดลำดับคิว (Ranking) ---
+    # คำนวณลำดับคิวจริงๆ (ไม่นับ Pagination) เพื่อแสดงผลในตาราง
     if status_filter == 'waiting':
         try:
-             # Fetch all IDs in correct order to determine true rank
-             # Must strictly match the order_by used before filtering for consistent ranking
              all_waiting_ids = list(QueueItem.objects.filter(status__code='WAITING').order_by('-is_urgent', 'queue_number').values_list('id', flat=True))
              rank_map = {pk: i+1 for i, pk in enumerate(all_waiting_ids)}
              
-             # Attach rank to the current page's objects
              for item in queue_list:
                  item.waiting_rank = rank_map.get(item.id, '-')
         except Exception as e:
             print(f"Error calculating ranks: {e}")
 
-    # ตรวจสอบชื่อเครื่อง (Optimized with Cache)
+    # --- ตรวจสอบสิทธิ์ Admin (Based on Hostname/IP) ---
     is_admin_computer = False
     client_ip = request.META.get('REMOTE_ADDR')
     
+    # ใช้ Caching Helper เพื่อลดความหน่วง
     hostname = get_hostname_from_ip(client_ip)
-    # print(f"DEBUG: Client IP={client_ip}, Hostname={hostname}")
     
     if hostname:
         current_hostname = hostname.upper()
-        # รายชื่อเครื่องที่อนุญาต (ควรทำเป็น List ไว้)
+        # รายชื่อเครื่องที่อนุญาตให้เป็น Admin
         admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24']
-
-        # ใช้ any() เพื่อเช็คว่ามีชื่อใดชื่อหนึ่งใน admin_hosts ปรากฏอยู่ใน hostname หรือไม่
+        
         if any(admin_host in current_hostname for admin_host in admin_hosts):
-            is_admin_computer = True
-            
+             is_admin_computer = True
+             
     if client_ip == '127.0.0.1':
         is_admin_computer = True
 
-    # Check Global Shift Status (Using ShiftClosure model)
-    # Automatic Close Logic: If time >= 21:00 and not closed -> Close it (unless opened AFTER 21:00 today)
+    # --- Logic ตรวจสอบและปิดกะอัตโนมัติ (Auto-Close Shift) ---
+    # ถ้าเวลาเกิน 21:00 และหน้าจอยังเปิดอยู่ -> สั่งปิดทันที (เว้นแต่มีการเปิด OT)
     now = timezone.now()
     if now.hour >= 21:
-        # Check if currently closed
+        # เช็คว่าปิดอยู่แล้วหรือยัง
         is_currently_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
         
         if not is_currently_closed:
-             # Check if it was opened AFTER 21:00 today (Overtime / Manual Override)
+             # เช็คว่ามีการเปิด OT (เปิดหลัง 3 ทุ่ม) หรือไม่
              today_21pm = now.replace(hour=21, minute=0, second=0, microsecond=0)
              has_overtime_open = ShiftClosure.objects.filter(opened_at__gte=today_21pm).exists()
              
              if not has_overtime_open:
-                 # Auto Close
+                 # สร้าง Record ปิดกะโดย System
                  ShiftClosure.objects.create(
                      closed_by='System (Auto)'
                  )
                  print(f"DEBUG: System Auto-Closed Shift at {now}")
 
-    # Re-check status
+    # --- สรุปสถานะการปิดกะเพื่อส่งไปที่ Template ---
     is_shift_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
     
     context = {
@@ -140,8 +143,6 @@ def dashboard(request):
         'search_query': search_query,
         'is_admin_computer': is_admin_computer,
         'all_statuses': all_statuses,
-        'all_statuses': all_statuses,
-        'all_statuses': all_statuses,
         'current_adhoc': current_adhoc,
         'is_shift_closed': is_shift_closed,
     }
@@ -150,12 +151,15 @@ def dashboard(request):
 
 @csrf_exempt
 def update_job_description(request):
+    """
+    API: อัปเดตหมายเหตุ (Note) หรือสถานะของ Job จาก Modal
+    """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             item_id = data.get('id')
-            comment = data.get('comment') # เปลี่ยนจาก description เป็น comment
-            status_id = data.get('status_id')
+            comment = data.get('comment') # หมายเหตุที่ user พิมพ์มา
+            status_id = data.get('status_id') # สถานะใหม่ที่ user เลือก
             
             queue_item = QueueItem.objects.get(id=item_id)
             queue_item.comment = comment
@@ -168,7 +172,6 @@ def update_job_description(request):
                     pass
             
             queue_item.save()
-            
             return JsonResponse({'success': True})
         except QueueItem.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Queue Item not found'})
@@ -179,11 +182,14 @@ def update_job_description(request):
 
 @csrf_exempt
 def toggle_urgent_status(request):
+    """
+    API: ใช้สลับสถานะความเร่งด่วน (Urgent) ของคิว
+    """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             item_id = data.get('id')
-            is_urgent = data.get('is_urgent') # รับค่ามาเป็น 1 หรือ 0 หรือ boolean
+            is_urgent = data.get('is_urgent')
             
             # แปลงเป็น integer (0 หรือ 1)
             if is_urgent is True or is_urgent == 'true' or is_urgent == 1:
@@ -207,6 +213,14 @@ def add_queue_item(request):
     return redirect('dashboard')
 
 def call_next_queue(request):
+    """
+    Function: ปุ่ม "เรียกคิวถัดไป" (Call Next)
+    หน้าที่:
+    1. ปิดงาน (Done) ให้กับงานที่ Active อยู่ปัจจุบัน
+    2. หาคิวถัดไปที่มีสถานะ Waiting
+    3. เปลี่ยนสถานะคิวถัดไปเป็น Active
+    4. ตรวจสอบเงื่อนไขการปิด BMS ก่อน (Validation)
+    """
     try:
         active_status = QueueStatus.objects.get(code='ACTIVE')
         waiting_status = QueueStatus.objects.get(code='WAITING')
@@ -217,14 +231,14 @@ def call_next_queue(request):
     # 1. ตรวจสอบงานปัจจุบันก่อนปิด (Validation Logic) -> เฉพาะ Normal Queue
     current_active_items = QueueItem.objects.filter(status=active_status, is_adhoc=0)
     for item in current_active_items:
-        # ถ้ามีการเชื่อมโยงกับ Job BMS
+        # ถ้ามีการเชื่อมโยงกับ Job BMS -> ต้องปิดงานใน BMS ก่อน
         if item.linked_job_no:
             try:
                 # ดึงข้อมูล Job BMS ล่าสุด
                 bms_job = JobsBms.objects.get(jobno=item.linked_job_no)
                 
                 # ตรวจสอบสถานะ (Allow only '2' or '12')
-                # หมายเหตุ: job_status เป็น CharField
+                # 2=ซ่อมเสร็จ, 12=ตรวจรับงานแล้ว
                 if bms_job.job_status not in ['2', '12']:
                      return JsonResponse({
                          'success': False, 
@@ -232,8 +246,6 @@ def call_next_queue(request):
                      })
                      
             except JobsBms.DoesNotExist:
-                # กรณีไม่เจอ Job ใน BMS (อาจจะ Sync ไม่ทัน หรือถูกลบ) 
-                # ให้ข้ามการตรวจสอบไปก่อน หรือจะ Block ก็ได้ แต่ข้ามดีกว่าเพื่อไม่ให้ระบบค้าง
                 pass
 
     # 2. ปิดงานเก่า (ถ้าผ่าน Validation)
@@ -241,7 +253,7 @@ def call_next_queue(request):
         item.status = done_status
         item.save()
     
-    # 3. เรียกคิวถัดไป (Priority: Urgent > Normal, then Queue Number)
+    # 3. เรียกคิวถัดไป (Priority: Urgent > Normal, แล้วเรียงตามเลขคิว)
     next_item = QueueItem.objects.filter(status=waiting_status).order_by('-is_urgent', 'queue_number').first()
     if next_item:
         next_item.status = active_status
@@ -251,6 +263,10 @@ def call_next_queue(request):
     return JsonResponse({'success': True})
 
 def finish_current_queue(request):
+    """
+    Function: ปุ่ม "จบงานโดยไม่เรียกคิวต่อ" (Finish Job)
+    หน้าที่: เปลี่ยนสถานะงาน Active ปัจจุบันเป็น Done โดยไม่ดึงคิวใหม่
+    """
     try:
         active_status = QueueStatus.objects.get(code='ACTIVE')
         done_status = QueueStatus.objects.get(code='DONE')
@@ -269,9 +285,10 @@ def finish_current_queue(request):
 @csrf_exempt
 def insert_queue_adhoc(request):
     """
-    แทรกคิว (Ad-hoc)
-    - เปลี่ยนสถานะคิวที่เลือกเป็น ACTIVE (2)
-    - เงื่อนไข: ต้องไม่มีคิวที่กำลัง ACTIVE อยู่ในขณะนั้น
+    API: แทรกคิว (Ad-hoc)
+    หน้าที่:
+    - เปลี่ยนสถานะคิวที่เลือก (จากใน List) เป็น ACTIVE (2) ทันที
+    - Note: จะทำได้ก็ต่อเมื่อไม่มีคิว Ad-hoc อื่นที่กำลัง Active อยู่
     """
     if request.method == 'POST':
         try:
@@ -292,7 +309,7 @@ def insert_queue_adhoc(request):
             # 3. อัปเดตสถานะเป็น ACTIVE
             queue_item.status = active_status
             queue_item.call_queue_date = timezone.now() # บันทึกเวลาที่เรียกคิว
-            queue_item.is_adhoc = 1 # เป็นคิวที่ถูกแทรก
+            queue_item.is_adhoc = 1 # Mark ว่าเป็นคิวที่ถูกแทรก
             
             queue_item.save()
             
@@ -308,6 +325,10 @@ def insert_queue_adhoc(request):
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 def finish_adhoc_queue(request):
+    """
+    Function: ปุ่ม "จบงานคิวแทรก" (Finish Ad-hoc)
+    หน้าที่: ปิดงานเฉพาะคิวที่แทรกเข้ามา (Ad-hoc) โดยไม่กระทบคิว Normal ที่อาจจะ Active ค้างอยู่
+    """
     try:
         active_status = QueueStatus.objects.get(code='ACTIVE')
         done_status = QueueStatus.objects.get(code='DONE')
@@ -346,38 +367,37 @@ def finish_adhoc_queue(request):
 @csrf_exempt
 def toggle_shift_status(request):
     """
-    Toggle the global service suspension status.
-    POST data: { 'closed': true/false }
+    API: เปลี่ยนสถานะการให้บริการ (ปิดกะ/เปิดกะ)
     Logic:
-    - Close: Create NEW ShiftClosure record.
-    - Open: Update the LATEST active ShiftClosure record (opened_at=None).
+    - ถ้าปิดกะ: สร้าง Record ShiftClosure ใหม่
+    - ถ้าเปิดกะ: อัปเดต opened_at ของ Record ล่าสุด
     """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             should_close = data.get('closed')
             
-            # Resolve Hostname logic (Optimized)
+            # Resolve Hostname Check (ดึงชื่อเครื่องผู้กด)
             client_ip = request.META.get('REMOTE_ADDR')
             hostname = get_hostname_from_ip(client_ip)
             
             if not hostname:
-                hostname = client_ip # Default to IP if validation fails
-
+                hostname = client_ip # ใช้ IP แทนถ้าหาชื่อไม่เจอ
+ 
             now = timezone.now().replace(microsecond=0)
             
             if should_close:
-                # Create NEW Record
+                # สร้าง Record ปิดกะใหม่
                 ShiftClosure.objects.create(
                     closed_by=hostname
-                    # closed_at is auto_now_add
+                    # closed_at จะถูกใส่ Auto ใน Model
                 )
                 is_closed = True
             else:
-                # Find the latest open closure (where opened_at is Null)
+                # หาประวัติการปิดกะล่าสุดที่ยังไม่เปิด
                 active_closures = ShiftClosure.objects.filter(opened_at__isnull=True)
                 if active_closures.exists():
-                    # Update all active closures (should ideally be just one, but safety first)
+                    # อัปเดตว่าเปิดกะแล้ว
                     active_closures.update(
                         opened_at=now,
                         opened_by=hostname
