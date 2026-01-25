@@ -3,7 +3,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
 from .models import QueueItem, QueueStatus, JobsBms, ShiftClosure
-from .utils import sync_jobs_from_mssql, get_hostname_from_ip 
+from .utils import sync_jobs_from_mssql, get_hostname_from_ip, get_client_ip 
 # การ Sync ข้อมูลถูกจัดการโดย management command แล้ว: python manage.py import_job_analysis
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
@@ -23,9 +23,10 @@ def dashboard(request):
     items = QueueItem.objects.all()
     
     # นับจำนวนตามสถานะต่างๆ เพื่อแสดงบนการ์ดด้านบน
+    now = timezone.now()
     waiting_count = items.filter(status__code='WAITING').count()
     active_count = items.filter(status__code='ACTIVE').count()
-    done_count = items.filter(status__code='DONE').count()
+    done_count = items.filter(status__code='DONE', created_at__month=now.month, created_at__year=now.year).count()
     coordinating_count = items.filter(status__code='COORDINATING').count()
     waiting_parts_count = items.filter(status__code='WAITING_PARTS').count()
     
@@ -38,6 +39,18 @@ def dashboard(request):
     
     # คิวแทรก (Ad-hoc) ที่กำลัง Active (ถ้ามี จะแสดงแทรกขึ้นมา)
     current_adhoc = items.filter(status__code='ACTIVE', is_adhoc=1).order_by('created_at').first()
+
+    # Helper to attach operator name
+    def attach_operator_name(queue_item):
+        if queue_item and queue_item.linked_job_no:
+             try:
+                 job = JobsBms.objects.get(jobno=queue_item.linked_job_no)
+                 queue_item.operator_name = job.name
+             except JobsBms.DoesNotExist:
+                 queue_item.operator_name = None
+    
+    attach_operator_name(current_queue)
+    attach_operator_name(current_adhoc)
     
     # --- Logic การกรองข้อมูล (Filter) ---
     status_filter = request.GET.get('status', 'waiting') # รับค่าจาก URL parameter
@@ -47,7 +60,7 @@ def dashboard(request):
         queue_list = items.filter(status__code='ACTIVE').order_by('created_at')
         list_title = "รายการที่กำลังดำเนินการ (Active)"
     elif status_filter == 'done':
-        queue_list = items.filter(status__code='DONE').order_by('created_at')
+        queue_list = items.filter(status__code='DONE', created_at__month=now.month, created_at__year=now.year).order_by('created_at')
         list_title = "รายการที่เสร็จสิ้น (Done)"
     elif status_filter == 'pending':
         queue_list = items.filter(status__code__in=['COORDINATING', 'WAITING_PARTS']).order_by('created_at')
@@ -92,10 +105,11 @@ def dashboard(request):
 
     # --- ตรวจสอบสิทธิ์ Admin (Based on Hostname/IP) ---
     is_admin_computer = False
-    client_ip = request.META.get('REMOTE_ADDR')
+    client_ip = get_client_ip(request)
     
     # ใช้ Caching Helper เพื่อลดความหน่วง
     hostname = get_hostname_from_ip(client_ip)
+    print(f"Client IP: {client_ip}, Hostname: {hostname}")
     
     if hostname:
         current_hostname = hostname.upper()
@@ -378,7 +392,7 @@ def toggle_shift_status(request):
             should_close = data.get('closed')
             
             # Resolve Hostname Check (ดึงชื่อเครื่องผู้กด)
-            client_ip = request.META.get('REMOTE_ADDR')
+            client_ip = get_client_ip(request)
             hostname = get_hostname_from_ip(client_ip)
             
             if not hostname:

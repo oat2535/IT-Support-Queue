@@ -418,3 +418,19 @@ def get_hostname_from_ip(ip_address):
         return hostname
     except Exception:
         return None
+
+def get_client_ip(request):
+    """
+    Function: ดึง IP Address ของ Client
+    รองรับทั้งการเชื่อมต่อตรง (Direct) และผ่าน Proxy (Nginx/Load Balancer)
+    โดยเช็คจาก HTTP_X_FORWARDED_FOR ก่อน
+    """
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        # กรณีผ่าน Proxy: Header จะเป็น list ของ IP เช่น "client_ip, proxy1_ip, proxy2_ip"
+        # เราต้องการ IP แรกสุด (Client IP จริง)
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        # กรณีเชื่อมต่อตรง
+        ip = request.META.get('REMOTE_ADDR')
+    return ip

@@ -80,6 +80,15 @@
                     <p class="mb-2 text-gray-500">หมายเลขคิวปัจจุบัน</p>
                     
                     {% if current_queue %}
+                        <!-- Operator Name Badge (Top Right) -->
+                        {% if current_queue.operator_name %}
+                        <div class="position-absolute" style="top: 15px; right: 20px;">
+                            <span class="badge badge-light shadow-sm text-primary" style="font-size: 0.9rem;">
+                                <i class="fas fa-user-circle mr-1"></i> {{ current_queue.operator_name }}
+                            </span>
+                        </div>
+                        {% endif %}
+                        
                         <!-- แสดงเลขคิวและชื่อ (ขนาดใหญ่) -->
                         <div class="queue-number-large text-primary">{{ current_queue.queue_number }}</div>
                         <h2 class="font-weight-bold text-gray-800">{{ current_queue.user_name }}</h2>
@@ -128,6 +137,15 @@
                     <p class="mb-2 text-gray-500">หมายเลขคิวแทรก</p>
                     
                      <div class="queue-number-large text-warning">{{ current_adhoc.queue_number }}</div>
+                     
+                     <!-- Operator Name Badge (Top Right) -->
+                     {% if current_adhoc.operator_name %}
+                     <div class="position-absolute" style="top: 15px; right: 20px;">
+                         <span class="badge badge-light shadow-sm text-warning" style="font-size: 0.9rem;">
+                             <i class="fas fa-user-circle mr-1"></i> {{ current_adhoc.operator_name }}
+                         </span>
+                     </div>
+                     {% endif %}
                      <h2 class="font-weight-bold text-gray-800">{{ current_adhoc.user_name }}</h2>
                      <p class="text-muted mb-2">{{ current_adhoc.user_department }} - <span data-toggle="tooltip" data-placement="top" data-html="true" title="{{ current_adhoc.issue_description|linebreaksbr }}">{{ current_adhoc.issue_description|truncatechars:50 }}</span></p>
                      <div class="mb-4">
