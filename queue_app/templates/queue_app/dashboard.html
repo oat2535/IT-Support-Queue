@@ -1,0 +1,723 @@
+{% extends 'queue_app/base.html' %}
+
+{% load static %}
+{% block content %}
+    <!-- Stats Row -->
+    <div class="row mb-4">
+        <!-- Total Today -->
+        <!-- Waiting -->
+        <div class="col-xl">
+            <a href="?status=waiting" class="text-decoration-none">
+                <div class="card bg-warning text-white status-card-hover shadow h-100 py-2" style="cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-uppercase mb-1" style="opacity: 0.8;">รอรับบริการ (Waiting)</div>
+                                <div class="h1 mb-0 font-weight-bold">{{ waiting_count }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-clock fa-2x text-white-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+
+
+        <!-- Done -->
+        <div class="col-xl">
+            <a href="?status=done" class="text-decoration-none">
+                <div class="card bg-success text-white status-card-hover shadow h-100 py-2" style="cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-uppercase mb-1" style="opacity: 0.8;">เสร็จสิ้น (Done)</div>
+                                <div class="h1 mb-0 font-weight-bold">{{ done_count }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-check-circle fa-2x text-white-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
+        <!-- Coordinating / Waiting Parts -->
+        <!-- Coordinating / Waiting Parts -->
+        <div class="col-xl">
+            <!-- ลิงก์ไปหน้า Pending (รอประสานงาน/อะไหล่) -->
+            <a href="?status=pending" class="text-decoration-none">
+                <div class="card bg-primary text-white status-card-hover shadow h-100 py-2" style="cursor: pointer;">
+                    <div class="card-body">
+                        <div class="row no-gutters align-items-center">
+                            <div class="col mr-2">
+                                <div class="text-xs font-weight-bold text-uppercase mb-1" style="opacity: 0.8;">รอประสานงาน/อะไหล่</div>
+                                <div class="h1 mb-0 font-weight-bold">{{ coordinating_count|add:waiting_parts_count }}</div>
+                            </div>
+                            <div class="col-auto">
+                                <i class="fas fa-exclamation-circle fa-2x text-white-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Current Queue & Status -->
+    <!-- Current Queue & Status -->
+    <div class="row">
+        <!-- Normal Active Queue -->
+        <div class="{% if current_adhoc %}col-lg-6{% else %}col-lg-12{% endif %} mb-4">
+            <div class="card current-queue-card shadow mb-4 border-left-info h-100">
+                <div class="card-header py-3 bg-white border-0">
+                    <h5 class="m-0 font-weight-bold text-primary"><i class="fas fa-bullhorn mr-2"></i> กำลังดำเนินการ</h5>
+                </div>
+                <div class="card-body text-center py-5">
+                    <p class="mb-2 text-gray-500">หมายเลขคิวปัจจุบัน</p>
+                    
+                    {% if current_queue %}
+                        <!-- Operator Name Badge (Top Right) -->
+                        {% if current_queue.operator_name %}
+                        <div class="position-absolute" style="top: 15px; right: 20px;">
+                            <span class="badge badge-light shadow-sm text-primary" style="font-size: 0.9rem;">
+                                <i class="fas fa-user-circle mr-1"></i> {{ current_queue.operator_name }}
+                            </span>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- แสดงเลขคิวและชื่อ (ขนาดใหญ่) -->
+                        <div class="queue-number-large text-primary">{{ current_queue.queue_number }}</div>
+                        <h2 class="font-weight-bold text-gray-800">{{ current_queue.user_name }}</h2>
+                        <!-- Tooltip แสดงรายละเอียดงานเต็มๆ -->
+                        <p class="text-muted mb-2">{{ current_queue.user_department }} - <span data-toggle="tooltip" data-placement="top" data-html="true" title="{{ current_queue.issue_description|linebreaksbr }}">{{ current_queue.issue_description|truncatechars:50 }}</span></p>
+                        <div class="mb-4">
+                            <span class="badge badge-info badge-pill px-4 py-2" style="font-size: 1.2rem;">กำลังดำเนินการ</span>
+                            {% if is_admin_computer or current_queue.comment %}
+                            <button class="btn btn-sm {% if current_queue.comment %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
+                                    onclick="openDescModal('{{ current_queue.id }}', '{% if current_queue.comment %}{{ current_queue.comment|escapejs }}{% endif %}', '{{ current_queue.status.id }}', '{{ current_queue.bms_note|escapejs }}')"
+                                    title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true" style="width: 32px; height: 32px;">
+                               {% if current_queue.comment or current_queue.bms_note %}
+                                 <i class="fas fa-sticky-note"></i>
+                               {% else %}
+                                 <i class="fas fa-plus"></i>
+                               {% endif %}
+                            </button>
+                            {% endif %}
+                            
+                            {% if is_admin_computer %}
+                             <!-- Siren Icon (Emoji) -->
+                             <span class="urgent-icon-btn {% if current_queue.is_urgent == 1 %}urgent-active{% else %}urgent-inactive{% endif %}"
+                                onclick="toggleUrgent('{{ current_queue.id }}', this)" 
+                                title="Mark as Urgent" data-toggle="tooltip">🚨</span>
+                            {% elif current_queue.is_urgent == 1 %}
+                             <span class="urgent-icon-btn urgent-active" style="cursor: default;" title="Urgent">🚨</span>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="queue-number-large text-gray-300">-</div>
+                        <h2 class="font-weight-bold text-gray-500">ว่าง</h2>
+                        <p class="text-muted">รอเรียกคิวถัดไป</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Ad-hoc Active Queue (Right Side) -->
+        {% if current_adhoc %}
+        <div class="col-lg-6 mb-4">
+            <div class="card current-queue-card shadow mb-4 border-left-warning h-100" style="background-color: #fffaf0;">
+                <div class="card-header py-3 bg-white border-0">
+                    <h5 class="m-0 font-weight-bold text-warning"><i class="fas fa-bolt mr-2"></i> คิวแทรก (Ad-hoc)</h5>
+                </div>
+                <div class="card-body text-center py-5">
+                    <p class="mb-2 text-gray-500">หมายเลขคิวแทรก</p>
+                    
+                     <div class="queue-number-large text-warning">{{ current_adhoc.queue_number }}</div>
+                     
+                     <!-- Operator Name Badge (Top Right) -->
+                     {% if current_adhoc.operator_name %}
+                     <div class="position-absolute" style="top: 15px; right: 20px;">
+                         <span class="badge badge-light shadow-sm text-warning" style="font-size: 0.9rem;">
+                             <i class="fas fa-user-circle mr-1"></i> {{ current_adhoc.operator_name }}
+                         </span>
+                     </div>
+                     {% endif %}
+                     <h2 class="font-weight-bold text-gray-800">{{ current_adhoc.user_name }}</h2>
+                     <p class="text-muted mb-2">{{ current_adhoc.user_department }} - <span data-toggle="tooltip" data-placement="top" data-html="true" title="{{ current_adhoc.issue_description|linebreaksbr }}">{{ current_adhoc.issue_description|truncatechars:50 }}</span></p>
+                     <div class="mb-4">
+                         <span class="badge badge-warning badge-pill px-4 py-2 text-white" style="font-size: 1.2rem;">กำลังดำเนินการ (แทรก)</span>
+                         
+                         {% if is_admin_computer or current_adhoc.comment or current_adhoc.bms_note %}
+                            <!-- ปุ่มบันทึกหมายเหตุ (Note) -->
+                            <button class="btn btn-sm {% if current_adhoc.comment or current_adhoc.bms_note %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
+                                    onclick="openDescModal('{{ current_adhoc.id }}', '{% if current_adhoc.comment %}{{ current_adhoc.comment|escapejs }}{% endif %}', '{{ current_adhoc.status.id }}', '{{ current_adhoc.bms_note|escapejs }}')"
+                                    title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true" style="width: 32px; height: 32px;">
+                               {% if current_adhoc.comment or current_adhoc.bms_note %}
+                                 <i class="fas fa-sticky-note"></i>
+                               {% else %}
+                                 <i class="fas fa-plus"></i>
+                               {% endif %}
+                            </button>
+                        {% endif %}
+                     </div>
+                     
+                     {% if is_admin_computer %}
+                     <!-- Finish button moved to Admin FAB -->
+                     {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Next Queues List -->
+    <div class="row" id="queue-list-section">
+        <div class="col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
+                    <h5 class="m-0 font-weight-bold text-dark"><i class="fas fa-list-ol mr-2"></i> {{ list_title }}</h5>
+                    <div class="d-flex align-items-center">
+                        <form class="form-inline mr-2" method="GET" action="#queue-list-section">
+                            {% if active_filter %}
+                            <!-- คงค่า active_filter ไว้เมื่อ search -->
+                            <input type="hidden" name="status" value="{{ active_filter }}">
+                            {% endif %}
+                            <div class="input-group">
+                                <input type="text" class="form-control bg-light border-0 small" placeholder="ค้นหา..."
+                                    aria-label="Search" aria-describedby="basic-addon2" name="q" value="{{ search_query }}">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary" type="submit">
+                                        <i class="fas fa-search fa-sm"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                        <a href="?status={{ active_filter }}#queue-list-section" class="btn btn-outline-primary" style="border-radius: 5px; padding: 6px 15px;">
+                            <i class="fas fa-sync-alt mr-1"></i> Refresh
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-striped mb-0">
+                        <thead class="bg-gray-200 text-gray-800">
+                            <tr>
+                                <th class="py-3">คิวที่</th>
+                                <th class="py-3">ผู้แจ้ง</th>
+                                <th class="py-3">สาขา</th>
+                                <th class="py-3">ปัญหา</th>
+                                <th class="py-3 text-center">เพิ่มเติม</th>
+                                <th class="py-3">เวลา</th>
+                                <th class="py-3">สถานะ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in queue_list %}
+                            <tr>
+                                <td class="font-weight-bold text-primary">
+                                    {% if active_filter == 'waiting' %}
+                                        {{ item.waiting_rank }}
+                                    {% else %}
+                                        {{ item.queue_number }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="font-weight-bold text-gray-800">{{ item.user_name }}</div>
+                                </td>
+                                <td>{{ item.user_department }}</td>
+                                <td data-toggle="tooltip" data-placement="top" data-html="true" title="{{ item.issue_description|linebreaksbr }}">
+                                    {{ item.issue_description|truncatechars:60 }}
+                                    
+                                    {% if is_admin_computer and item.status.code == 'WAITING' %}
+                                        <span class="urgent-icon-btn {% if item.is_urgent == 1 %}urgent-active{% else %}urgent-inactive{% endif %}"
+                                           onclick="toggleUrgent('{{ item.id }}', this)" 
+                                           title="Mark as Urgent" data-toggle="tooltip">🚨</span>
+                                        
+                                        <!-- Ad-hoc (Insert Queue) Button -->
+                                        <span class="urgent-icon-btn {% if item.is_adhoc == 1 %}text-warning{% else %}adhoc-inactive{% endif %} ml-2" 
+                                              style="font-size: 1.2rem;"
+                                              onclick="insertQueue('{{ item.id }}')"
+                                              title="แทรกคิว (Ad-hoc)" data-toggle="tooltip">
+                                            <i class="fas fa-bolt"></i>
+                                        </span>
+                                    {% else %}
+                                        {% if item.is_urgent == 1 %}
+                                            <span class="urgent-icon-btn urgent-active" style="cursor: default;" title="Urgent">🚨</span>
+                                        {% endif %}
+                                        {% if item.is_adhoc == 1 %}
+                                            <span class="urgent-icon-btn text-warning ml-2" style="font-size: 1.2rem; cursor: default;" title="รายการแทรกคิว (Ad-hoc)">
+                                                <i class="fas fa-bolt"></i>
+                                            </span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if is_admin_computer or item.comment or item.bms_note %}
+                                    <button class="btn btn-sm {% if item.comment or item.bms_note %}btn-info{% else %}btn-outline-secondary{% endif %} desc-btn" 
+                                            onclick="openDescModal('{{ item.id }}', '{% if item.comment %}{{ item.comment|escapejs }}{% endif %}', '{{ item.status.id }}', '{{ item.bms_note|escapejs }}')"
+                                            title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true">
+                                       {% if item.comment or item.bms_note %}
+                                         <i class="fas fa-sticky-note"></i>
+                                       {% else %}
+                                         <i class="fas fa-plus"></i>
+                                       {% endif %}
+                                    </button>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.created_at|date:"d/m H:i" }}</td>
+                                <td>
+                                    <span class="badge badge-{{ item.status.color|default:'secondary' }}">{{ item.status.name }}</span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4 text-gray-500">
+                                    ไม่พบข้อมูลในรายการนี้
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if queue_list.has_other_pages %}
+                <div class="card-footer bg-white py-3">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center mb-0">
+                            {% if queue_list.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ queue_list.previous_page_number }}&status={{ active_filter }}&q={{ search_query }}#queue-list-section" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#queue-list-section" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                            
+                            {% for i in queue_list.paginator.page_range %}
+                                {% if queue_list.number == i %}
+                                <li class="page-item active"><a class="page-link" href="#queue-list-section">{{ i }}</a></li>
+                                {% else %}
+                                <li class="page-item"><a class="page-link" href="?page={{ i }}&status={{ active_filter }}&q={{ search_query }}#queue-list-section">{{ i }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if queue_list.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ queue_list.next_page_number }}&status={{ active_filter }}&q={{ search_query }}#queue-list-section" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#queue-list-section" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Description Modal -->
+    <div class="modal fade" id="descModal" tabindex="-1" role="dialog" aria-labelledby="descModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="descModalLabel">รายละเอียดเพิ่มเติม</h5>
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" id="modal-job-id">
+            <div class="form-group">
+                <label for="modal-bms-note">รายละเอียดแก้ไข / Note(BMS):</label>
+                <textarea class="form-control" id="modal-bms-note" rows="3" readonly style="background-color: #e9ecef;"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="modal-desc-text">หมายเหตุ / Comment:</label>
+                <textarea class="form-control" id="modal-desc-text" rows="5"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-dismiss="modal">ปิด</button>
+            <button type="button" class="btn btn-primary" onclick="saveDescription()">บันทึก</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Floating Action Button -->
+    {% if is_admin_computer %}
+    <div id="admin-fab-container" class="d-flex flex-column align-items-end" style="position: fixed; bottom: 30px; right: 30px; z-index: 1000;">
+        <!-- Menu Items -->
+        <div id="admin-menu" class="bg-white shadow-lg rounded-lg mb-3" style="width: 250px; border-radius: 12px; border: 1px solid #e3e6f0; display: none; transform-origin: bottom right;">
+            <div class="p-3">
+                <div class="mb-3 text-gray-500 font-weight-bold" style="font-size: 0.9rem;">Admin Tools</div>
+                
+                <a href="{% url 'call_next' %}" id="call-next-btn" class="d-flex align-items-center text-dark text-decoration-none mb-3 admin-menu-item" data-active-count="{{ active_count }}">
+                    <div class="mr-3 text-primary font-weight-bold"><i class="fas fa-bullhorn"></i></div>
+                    <div>เรียกคิวถัดไป</div>
+                </a>
+
+                {% if current_adhoc %}
+                <a href="#" id="finish-adhoc-btn" class="d-flex align-items-center text-dark text-decoration-none mb-3 admin-menu-item">
+                    <div class="mr-3 text-warning font-weight-bold"><i class="fas fa-bolt"></i></div>
+                    <div>จบงานแทรก (Ad-hoc)</div>
+                </a>
+                {% endif %}
+                
+            </div>
+        </div>
+
+        <!-- FAB Button -->
+        <button id="admin-fab" class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 1.5rem; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);" onclick="toggleAdminMenu()">
+            <i class="fas fa-tools" id="admin-fab-icon"></i>
+        </button>
+    </div>
+    {% endif %}
+
+    <!-- Custom Siren Icon Style -->
+    <style>
+        .admin-menu-item {
+            transition: all 0.2s ease;
+            padding: 8px;
+            border-radius: 8px;
+        }
+        
+        /* Font Awesome Siren/Urgent Icon */
+        .urgent-icon-btn {
+            font-size: 1.5rem; /* Adjust size as needed */
+            cursor: pointer;
+            margin-left: 10px;
+            vertical-align: middle;
+            transition: all 0.3s ease;
+        }
+
+        /* Inactive State */
+        /* Inactive State */
+        .urgent-inactive {
+            color: #ccc;
+            filter: grayscale(100%);
+            opacity: 0.5;
+        }
+        
+        /* Ad-hoc Inactive State (Brighter) */
+        .adhoc-inactive {
+            color: #ddd; /* Lighter grey */
+            filter: grayscale(100%);
+            opacity: 0.9; /* More visible */
+        }
+
+        /* Active State - pulsing siren */
+        .urgent-active {
+            opacity: 1;
+            animation: emoji-siren-pulse 0.8s infinite alternate;
+            filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.6));
+        }
+
+        @keyframes emoji-siren-pulse {
+            from { transform: scale(1); filter: brightness(1); }
+            to { transform: scale(1.2); filter: brightness(1.3); }
+        }
+
+        /* Status Card Hover Effect */
+        .status-card-hover {
+            transition: transform 0.2s ease-in-out;
+        }
+        .status-card-hover:hover {
+            transform: scale(1.05);
+            z-index: 10; /* Ensure it pops over neighbors if needed */
+        }
+    </style>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        var IS_ADMIN = "{{ is_admin_computer|yesno:'true,false' }}" === "true";
+
+        function openDescModal(id, comment, statusId, bmsNote) {
+            /**
+             * เปิด Modal บันทึกหมายเหตุ
+             * - ถ้าไม่ใช่ Adminจะเป็น Read-only
+             * - แสดง bmsNote (ถ้ามี)
+             */
+            $('#modal-job-id').val(id);
+            $('#modal-desc-text').val(comment);
+            $('#modal-bms-note').val(bmsNote);
+            
+            if (!IS_ADMIN) {
+                // Read-only mode for non-admin
+                $('#modal-desc-text').prop('disabled', true);
+                $('#descModal .modal-footer .btn-primary').hide(); // Hide Save button
+                $('#descModalLabel').text('รายละเอียดเพิ่มเติม (Read Only)');
+            } else {
+                // Edit mode for admin
+                $('#modal-desc-text').prop('disabled', false);
+                $('#descModal .modal-footer .btn-primary').show(); // Show Save button
+                $('#descModalLabel').text('รายละเอียดเพิ่มเติม');
+            }
+
+            $('#descModal').modal('show');
+        }
+
+        function saveDescription() {
+            /**
+             * บันทึกหมายเหตุ (AJAX)
+             */
+            var id = $('#modal-job-id').val();
+            var comment = $('#modal-desc-text').val();
+            
+            $.ajax({
+                url: '{% url "update_job_desc" %}',
+                type: 'POST',
+                data: JSON.stringify({id: id, comment: comment}),
+                contentType: 'application/json',
+                success: function(response) {
+                    if(response.success) {
+                        $('#descModal').modal('hide');
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'บันทึกข้อมูลเรียบร้อย',
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => {
+                            window.location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.error
+                        });
+                    }
+                },
+                error: function() {
+                     Swal.fire({
+                            icon: 'error',
+                            title: 'Connection Error',
+                        });
+                }
+            });
+        }
+
+        function toggleUrgent(id, imgElement) {
+            // Determine current state based on class
+            var $img = $(imgElement);
+            var isCurrentlyUrgent = $img.hasClass('urgent-active');
+            var newState = !isCurrentlyUrgent ? 1 : 0; // Toggle between 1 and 0
+
+            $.ajax({
+                url: '{% url "toggle_urgent" %}',
+                type: 'POST',
+                data: JSON.stringify({id: id, is_urgent: newState}),
+                contentType: 'application/json',
+                success: function(response) {
+                    if(response.success) {
+                        if (newState === 1) {
+                            $img.removeClass('urgent-inactive').addClass('urgent-active');
+                        } else {
+                            $img.removeClass('urgent-active').addClass('urgent-inactive');
+                        }
+                    } else {
+                         Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.error
+                        });
+                    }
+                },
+                error: function() {
+                     Swal.fire({
+                            icon: 'error',
+                            title: 'Connection Error',
+                        });
+                }
+            });
+        }
+        
+        function insertQueue(id) {
+            Swal.fire({
+                title: 'ต้องการแทรกคิวงานนี้ใช่หรือไม่?',
+                text: "งานนี้จะถูกเปลี่ยนสถานะเป็นกำลังดำเนินการทันที",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ใช่, แทรกคิวเลย!',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '{% url "insert_queue" %}',
+                        type: 'POST',
+                        data: JSON.stringify({id: id}),
+                        contentType: 'application/json',
+                        success: function(response) {
+                            if(response.success) {
+                                window.location.reload();
+                            } else {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ไม่สามารถแทรกคิวได้',
+                                    text: response.error
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Connection Error',
+                                text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+                            });
+                        }
+                    });
+                }
+            })
+        }
+        
+        function toggleAdminMenu() {
+            /**
+             * จัดการปุ่ม Menu Admin (FAB) ที่มุมขวาล่าง
+             * สลับไอคอนระหว่าง ไขควง <-> กากบาท
+             */
+            var $menu = $('#admin-menu');
+            var $fab = $('#admin-fab');
+            var $icon = $('#admin-fab-icon');
+            
+            if ($menu.is(':visible')) {
+                $menu.fadeOut(200);
+                $fab.css('transform', 'rotate(0deg)');
+                $icon.removeClass('fa-times').addClass('fa-tools');
+            } else {
+                $menu.fadeIn(200);
+                $fab.css('transform', 'rotate(90deg)');
+                $icon.removeClass('fa-tools').addClass('fa-times');
+            }
+        }
+
+        // Call Next Queue AJAX
+        $('#call-next-btn').on('click', function(e) {
+            e.preventDefault();
+            var url = $(this).attr('href');
+            
+            Swal.fire({
+                title: 'ยืนยันเรียกคิวถัดไป?',
+                text: "คุณต้องการปิดงานปัจจุบันและเรียกคิวถัดไปใช่หรือไม่",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#4e73df',
+                cancelButtonColor: '#858796',
+                confirmButtonText: 'ใช่, เรียกเลย',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: url,
+                        type: 'GET',
+                        success: function(response) {
+                            if (response.success) {
+                                window.location.reload();
+                            } else {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ไม่สามารถเรียกคิวถัดไปได้',
+                                    text: response.error,
+                                    confirmButtonText: 'ตกลง'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Connection Error',
+                                text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+                            });
+                        }
+                    });
+                }
+            });
+        });
+
+        
+        // Close menu when clicking outside
+        $(document).click(function(event) { 
+            var $target = $(event.target);
+            if(!$target.closest('#admin-fab-container').length && 
+               $('#admin-menu').is(":visible")) {
+                toggleAdminMenu();
+            }        
+        });
+        
+        // Initialize Tooltips
+        $(function () {
+          $('[data-toggle="tooltip"]').tooltip({
+              html: true
+          })
+        })
+
+        // Auto Refresh every 1 minute (60,000 ms)
+        // Check: ห้าม Refresh ถ้า Modal เปิดอยู่ (เดี๋ยว User พิมพ์ค้างไว้หาย)
+        setInterval(function() {
+            if (!$('.modal').hasClass('show')) {
+                window.location.reload();
+            }
+        }, 60000);
+        
+        // Finish Ad-hoc Queue AJAX
+        $('#finish-adhoc-btn').on('click', function(e) {
+            e.preventDefault();
+            
+            Swal.fire({
+                title: 'ยืนยันจบงานคิวแทรก?',
+                text: "คุณต้องการจบงานคิวแทรก (Ad-hoc) นี้ใช่หรือไม่",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ใช่, จบงานเลย',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $.ajax({
+                        url: '{% url "finish_adhoc" %}',
+                        type: 'GET', // Using GET as per original link, or move to POST if safer. Original view accepts GET? No check in code, assuming GET is default for `redirect` view logic, but mostly links are GET.
+                        // Wait, my updated view is generic. Let's stick to GET for now to match default simple view, or POST if I want to be strict.
+                        // Actually the user didn't specify method, but better use GET for consistency with previous link, or POST.
+                        // Let's use GET since I didn't enforce POST in the python view for this specific function (checked views.py, finish_adhoc_queue doesn't check method `if request.method == 'POST'`).
+                        success: function(response) {
+                            if (response.success) {
+                                window.location.reload();
+                            } else {
+                                Swal.fire({
+                                    icon: 'warning',
+                                    title: 'ไม่สามารถปิดงานได้',
+                                    text: response.error,
+                                    confirmButtonText: 'ตกลง'
+                                });
+                            }
+                        },
+                        error: function() {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Connection Error',
+                                text: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้'
+                            });
+                        }
+                    });
+                }
+            });
+        });
+    </script>
+{% endblock %}
