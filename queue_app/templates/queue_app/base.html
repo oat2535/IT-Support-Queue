@@ -1,0 +1,198 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>IT Service Queue</title>
+
+    <!-- Custom fonts -->
+    <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet" type="text/css">
+    <link href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i" rel="stylesheet">
+
+    <!-- SB Admin 2 CSS -->
+    <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
+    
+    <style>
+        .bg-header { background-color: #1a237e; color: white; }
+        .card-stat { border: none; border-radius: 15px; }
+        .card-stat .card-body { padding: 1.5rem; }
+        .stat-label { font-size: 0.9rem; opacity: 0.9; }
+        .stat-value { font-size: 2.5rem; font-weight: bold; }
+        .badge-status { font-size: 0.9rem; padding: 0.5em 1em; border-radius: 50px; }
+        
+        .current-queue-card { border: none; border-radius: 15px; }
+        .queue-number-large { font-size: 6rem; font-weight: 800; line-height: 1; margin: 20px 0; }
+        
+        /* Specific card colors from image approximation */
+        .bg-card-blue { background-color: #2e59d9; color: white; }
+        .bg-card-yellow { background-color: #f6c23e; color: #333; } /* Warning color */
+        .bg-card-cyan { background-color: #36b9cc; color: white; } /* Info color */
+        .bg-card-green { background-color: #1cc88a; color: white; } /* Success color */
+        
+        /* Table styling */
+        .table-striped tbody tr:nth-of-type(odd) { background-color: rgba(0,0,0,.02); }
+        .table td { vertical-align: middle; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body id="page-top" class="bg-gray-100">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center justify-content-between px-4 py-3 bg-header shadow mb-4">
+        <!-- ฝั่งซ้าย: โลโก้และชื่อโปรแกรม -->
+        <div class="d-flex align-items-center">
+            <img src="{% static 'img/TLPHLogo.png' %}" alt="Logo" style="height: 50px;" class="mr-3">
+            <div class="h3 mb-0 font-weight-bold" style="letter-spacing: 1px; padding-top: 8px;">IT Service Queue</div>
+        </div>
+        
+        <!-- ฝั่งขวา: นาฬิกาและปุ่มจัดการกะ -->
+        <div class="d-flex align-items-center">
+            {% if is_admin_computer %}
+            <!-- ปุ่มปิดกะ (แสดงเฉพาะ Admin) -->
+            <button id="close-shift-btn" class="btn btn-danger btn-sm mr-3 font-weight-bold shadow-sm">
+                <i class="fas fa-store-slash mr-1"></i> ปิดกะ
+            </button>
+            {% endif %}
+            
+            <!-- นาฬิกาดิจิตอล -->
+            <div class="h5 mb-0 font-weight-bold border-left pl-3 ml-2" style="border-color: rgba(255,255,255,0.3) !important;" id="clock">00:00:00</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container-fluid">
+        {% block content %}{% endblock %}
+    </div>
+    <!-- /.container-fluid -->
+
+    <!-- Bootstrap core JavaScript-->
+    <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/jquery-easing/jquery.easing.min.js' %}"></script>
+    <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        function updateClock() {
+            var now = new Date();
+            var hours = String(now.getHours()).padStart(2, '0');
+            var minutes = String(now.getMinutes()).padStart(2, '0');
+            var seconds = String(now.getSeconds()).padStart(2, '0');
+            if (document.getElementById('clock')) {
+                document.getElementById('clock').textContent = hours + ':' + minutes + ':' + seconds;
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Check Access Rights from Django Context
+        // Check Access Rights from Django Context (รับค่าจาก Server)
+        var IS_ADMIN = "{{ is_admin_computer|yesno:'true,false' }}" === "true";
+        var IS_SHIFT_CLOSED = "{{ is_shift_closed|yesno:'true,false' }}" === "true";
+
+        // Close Shift Button Handler
+        $(document).ready(function() {
+            // Check State on Load: ถ้าปิดกะอยู่ ให้แสดง Popup ทันที
+            if (IS_SHIFT_CLOSED) {
+                showClosedPopup();
+            }
+
+            // Event Listener สำหรับปุ่มปิดกะ
+            $('#close-shift-btn').on('click', function() {
+                Swal.fire({
+                    title: 'ยืนยันปิดกะ?',
+                    text: "คุณต้องการปิดระบบให้บริการใช่หรือไม่ หน้าจอจะถูก Freeze ทันที",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e74a3b', // red
+                    cancelButtonColor: '#858796', // secondary
+                    confirmButtonText: 'ใช่, ปิดกะเลย',
+                    cancelButtonText: 'ยกเลิก'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        toggleShift(true); // เรียก Ajax ปิดกะ
+                    }
+                });
+            });
+        });
+
+        function toggleShift(shouldClose) {
+            /** 
+             * ฟังก์ชันยิง Ajax ไปที่ Server เพื่อเปลี่ยนสถานะ Shift 
+             */
+            $.ajax({
+                url: '{% url "toggle_shift_status" %}',
+                type: 'POST',
+                data: JSON.stringify({closed: shouldClose}),
+                contentType: 'application/json',
+                success: function(response) {
+                    if(response.success) {
+                        window.location.reload(); // รีโหลดหน้าเพื่อ update state
+                    } else {
+                        Swal.fire('Error', response.error, 'error');
+                    }
+                },
+                error: function() {
+                     Swal.fire('Error', 'Connection Error', 'error');
+                }
+            });
+        }
+
+        function showClosedPopup() {
+            /**
+             * แสดง Popup ปิดกะ (Lock Screen)
+             * - ห้ามกดปิด (allowOutsideClick: false)
+             * - Admin จะเห็นปุ่ม "เปิดกะ" ที่ Footer
+             */
+            
+            // Content ข้อความที่จะแสดง
+            var contentHtml = 'เวลาให้บริการ 09.00 น. - 21.00 น.<br>หากมีเคสเร่งด่วนรบกวนติดต่อที่เบอร์ 99901';
+            
+            // Footer: ปุ่มเปิดกะสำหรับ Admin เท่านั้น
+            var footerContent = '';
+            if (IS_ADMIN) {
+                footerContent = '<button class="btn btn-success font-weight-bold py-2 px-4 shadow" onclick="openShift()"><i class="fas fa-store mr-2"></i>เปิดกะ (Open Shift)</button>';
+            }
+
+            Swal.fire({
+                title: 'ตอนนี้อยู่นอกเวลาการให้บริการของแผนก IT',
+                html: contentHtml,
+                icon: 'info',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                backdrop: 'rgba(0, 0, 0, 0.98)', // make background dark
+                footer: footerContent,
+                customClass: {
+                    footer: 'border-0 pt-0 pb-4'
+                }
+            });
+        }
+
+        function openShift() {
+            Swal.fire({
+                title: 'ยืนยันเปิดกะ?',
+                text: "ต้องการเริ่มให้บริการตามปกติใช่หรือไม่",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#1cc88a',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'ใช่, เปิดกะ',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    toggleShift(false);
+                } else {
+                    // Re-show the lock popup if cancelled
+                    showClosedPopup();
+                }
+            });
+        }
+    </script>
+    {% block extra_js %}{% endblock %}
+
+</body>
+</html>
