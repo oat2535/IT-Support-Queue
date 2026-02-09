@@ -96,8 +96,8 @@
                         <p class="text-muted mb-2">{{ current_queue.user_department }} - <span data-toggle="tooltip" data-placement="top" data-html="true" title="{{ current_queue.issue_description|linebreaksbr }}">{{ current_queue.issue_description|truncatechars:50 }}</span></p>
                         <div class="mb-4">
                             <span class="badge badge-info badge-pill px-4 py-2" style="font-size: 1.2rem;">กำลังดำเนินการ</span>
-                            {% if is_admin_computer or current_queue.comment %}
-                            <button class="btn btn-sm {% if current_queue.comment %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
+                            {% if is_admin_computer or current_queue.comment or current_queue.bms_note %}
+                            <button class="btn btn-sm {% if current_queue.comment or current_queue.bms_note %}btn-info{% else %}btn-outline-secondary{% endif %} rounded-circle ml-2" 
                                     onclick="openDescModal('{{ current_queue.id }}', '{% if current_queue.comment %}{{ current_queue.comment|escapejs }}{% endif %}', '{{ current_queue.status.id }}', '{{ current_queue.bms_note|escapejs }}')"
                                     title="บันทึกหมายเหตุ" data-toggle="tooltip" data-placement="top" data-html="true" style="width: 32px; height: 32px;">
                                {% if current_queue.comment or current_queue.bms_note %}
