@@ -36,8 +36,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # คัดลอกไฟล์โปรเจคทั้งหมดใน Folder ปัจจุบัน เข้าสู่ Container
 COPY . /app/
 
-# เปิด Port 8000 สำหรับการเชื่อมต่อ
+# เปิด Port 5679 สำหรับการเชื่อมต่อ
 EXPOSE 5679
 
 # คำสั่งเริ่มต้นเมื่อ Container ทำงาน (รัน Server Django)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:5679"]
