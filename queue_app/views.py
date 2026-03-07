@@ -116,7 +116,7 @@ def dashboard(request):
     if hostname:
         current_hostname = hostname.upper()
         # รายชื่อเครื่องที่อนุญาตให้เป็น Admin (เช็คแบบ Case-Insensitive)
-        admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24', 'OAT-IT'] 
+        admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24', 'OAT-IT', 'DESKTOP-EEVE5RF'] 
         
         # ตรวจสอบว่า hostname อยู่ใน list หรือไม่ (แปลงเป็น Upper case ทั้งหมด)
         if current_hostname in [h.upper() for h in admin_hosts]:
