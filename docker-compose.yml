@@ -4,9 +4,7 @@ services:
   web:
     build: .
     ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
+      - "5679:5679"
     # ใช้ environment variables ในการตั้งค่า (สามารถเพิ่ม SECRET_KEY หรือ DB_PASSWORD ที่นี่ได้ในอนาคต)
     environment:
       - DEBUG=1
@@ -15,9 +13,6 @@ services:
     stdin_open: true
     networks:
       - app_network
-    extra_hosts:
-      - "DESKTOP-TIC1FOD:172.25.0.1"
-
 networks:
   app_network:
     driver: bridge
