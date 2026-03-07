@@ -139,8 +139,16 @@ USE_TZ = False
 # ไฟล์ Static (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
+# STATIC_URL = 'static/'
+# # ตำแหน่งเก็บไฟล์ Static ของโปรเจค
+# STATICFILES_DIRS = [
+#     BASE_DIR / "startbootstrap-sb-admin-2-gh-pages",
+# ]
+
 STATIC_URL = 'static/'
-# ตำแหน่งเก็บไฟล์ Static ของโปรเจค
+# เพิ่มบรรทัดนี้เพื่อให้ Django รู้ว่าจะเอาไฟล์ static ทั้งหมดมารวมไว้ที่ไหนตอนสั่ง collectstatic
+STATIC_ROOT = BASE_DIR / "staticfiles"
+# ตำแหน่งเก็บไฟล์ Static ของโปรเจค (คงไว้เหมือนเดิม)
 STATICFILES_DIRS = [
     BASE_DIR / "startbootstrap-sb-admin-2-gh-pages",
 ]
