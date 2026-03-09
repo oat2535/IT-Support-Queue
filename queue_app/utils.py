@@ -3,6 +3,7 @@ from .models import JobsBms
 from datetime import datetime
 import socket
 from functools import lru_cache
+from nmb.NetBIOS import NetBIOS
 
 def sync_jobs_from_mssql():
     """
@@ -407,15 +408,27 @@ def update_queue_status_from_logic():
 
 @lru_cache(maxsize=128)
 def get_hostname_from_ip(ip_address):
-    """
-    Function: Resolve Hostname from IP (with Caching)
-    """
+    # 1. ลองหาผ่าน DNS ดูก่อน (แบบเดิม)
     try:
         hostname, _, _ = socket.gethostbyaddr(ip_address)
         return hostname
     except Exception:
-        # ถ้าหาชื่อเครื่องไม่เจอ (เช่น คนต่อ VPN) ให้ส่งกลับเป็น IP แทนคำว่า None
-        return f"Unknown ({ip_address})"
+        pass
+    
+    # 2. ถ้ามาจาก VPN และ DNS ไม่รู้จัก ให้ลองใช้ NetBIOS ยิงไปถามเครื่อง Windows ตรงๆ
+    try:
+        bios = NetBIOS()
+        # ยิงคำถามไปที่ IP ปกติรอ 2 วินาที
+        names = bios.queryIPForName(ip_address, timeout=2)
+        bios.close()
+        
+        if names:
+            return names[0] # คืนค่าชื่อคอมพิวเตอร์ที่ได้กลับมา
+    except Exception:
+        pass
+        
+    # 3. ถ้าหาด้วยวิธีไหนก็ไม่เจอจริงๆ คืนค่าเป็นหมายเลข IP แทน
+    return f"VPN/Unknown ({ip_address})"
 
 def get_client_ip(request):
     """
