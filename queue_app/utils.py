@@ -409,15 +409,13 @@ def update_queue_status_from_logic():
 def get_hostname_from_ip(ip_address):
     """
     Function: Resolve Hostname from IP (with Caching)
-    หน้าที่: แปลง IP (เช่น 192.168.1.33) เป็นชื่อเครื่อง (Hostname)
-    - ใช้ @lru_cache เพื่อเก็บค่าที่เคยหาแล้วไว้ใน Memory ไม่ต้องหาใหม่ทุกครั้ง
-    - ช่วยลดเวลาโหลดหน้าเว็บกรณี Network ช้า
     """
     try:
         hostname, _, _ = socket.gethostbyaddr(ip_address)
         return hostname
     except Exception:
-        return None
+        # ถ้าหาชื่อเครื่องไม่เจอ (เช่น คนต่อ VPN) ให้ส่งกลับเป็น IP แทนคำว่า None
+        return f"Unknown ({ip_address})"
 
 def get_client_ip(request):
     """
