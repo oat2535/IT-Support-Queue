@@ -92,18 +92,12 @@ class QueueItem(models.Model):
         """
         Retrieves the 'note' from the linked JobsBms record.
         """
+        # ป้องกัน N+1 Query: ถ้า View มีการโหลดและแนบ _cached_bms_note มาให้แล้วให้ส่งค่ากลับทันที
+        if hasattr(self, '_cached_bms_note'):
+            return self._cached_bms_note
+
         if self.linked_job_no:
             try:
-                # Import inside to avoid circular dependency if any (though models.py is same file usually safe but JobsBms is below)
-                # Since JobsBms is defined later in the file, we might need to use explicit string reference or move it?
-                # Actually, in Python class scope, if defined in same module it's fine as long as we use it at runtime.
-                # But JobsBms is defined BELOW QueueItem. 
-                # So we must use: from .models import JobsBms (but we are inside models.py)
-                # Or just JobsBms.objects.get() works if JobsBms is defined at module level 
-                # BUT since it is defined BELOW, it might not be available at define time but IS available at runtime.
-                # To be safe, we can move JobsBms above or just assume runtime resolution works.
-                # Standard Python: names defined in module are available to methods at runtime.
-                
                 return JobsBms.objects.get(jobno=self.linked_job_no).note or ''
             except JobsBms.DoesNotExist:
                 return ''

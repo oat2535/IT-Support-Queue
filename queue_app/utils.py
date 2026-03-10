@@ -322,37 +322,50 @@ def sync_to_queue_items():
     
     jobs_to_sync = JobsBms.objects.exclude(jobno__in=existing_linked_ids).order_by('req_date')
     
+    # เอา Query การหาคิวล่าสุดไว้นอกลูปเพื่อ Performance
+    last_item = QueueItem.objects.all().order_by('id').last()
+    if last_item and last_item.queue_number.startswith('IT-'):
+        try:
+            current_num = int(last_item.queue_number.split('-')[1])
+        except ValueError:
+            current_num = 0
+    else:
+        current_num = 0
+        
+    # ดึงหมายเลขคิวทั้งหมดที่มีอยู่ในระบบมาเป็น Set ของ Python เพื่อเช็คซ้ำใน RAM แทนที่จะเช็คใน Database
+    existing_q_numbers = set(QueueItem.objects.values_list('queue_number', flat=True))
+    
+    new_queue_items = []
+    
     for job in jobs_to_sync:
-        # Generate Queue Number: IT-{running_number}
-        # คำนวณเลขล่าสุด + 1
+        current_num += 1
+        queue_number = f"IT-{current_num:04d}"
         
-        last_item = QueueItem.objects.all().order_by('id').last()
-        if last_item and last_item.queue_number.startswith('IT-'):
-            try:
-                last_num = int(last_item.queue_number.split('-')[1])
-                new_num = last_num + 1
-            except ValueError:
-                new_num = 1
-        else:
-            new_num = 1
+        # ป้องกันเลขซ้ำ (เช็คจากตัวแปร Set ใน Memory จะเร็วกว่า Database เป็นพันเท่า)
+        while queue_number in existing_q_numbers:
+            current_num += 1
+            queue_number = f"IT-{current_num:04d}"
             
-        queue_number = f"IT-{new_num:04d}"
+        existing_q_numbers.add(queue_number) # จำเลขที่ใช้ไปแล้ว
         
-        # ป้องกันเลขซ้ำ (Concurrency Safety Check)
-        while QueueItem.objects.filter(queue_number=queue_number).exists():
-            new_num += 1
-            queue_number = f"IT-{new_num:04d}"
-        
-        QueueItem.objects.create(
-            queue_number=queue_number,
-            user_name=job.caller or 'Unknown',
-            user_department=job.descriptions or 'Unknown',
-            issue_description=job.description or '',
-            created_at=job.req_date,
-            status=waiting_status,
-            linked_job_no=job.jobno
+        # รวบรวมข้อมูลลง List เตรียมนำไป Insert ทีเดียว
+        new_queue_items.append(
+            QueueItem(
+                queue_number=queue_number,
+                user_name=job.caller or 'Unknown',
+                user_department=job.descriptions or 'Unknown',
+                issue_description=job.description or '',
+                created_at=job.req_date,
+                status=waiting_status,
+                linked_job_no=job.jobno
+            )
         )
-        print(f"Created QueueItem {queue_number} for Job {job.jobno}")
+        print(f"Prepared QueueItem {queue_number} for Job {job.jobno}")
+        
+    # ใช้ bulk_create สร้างทั้งหมดในการต่อฐานข้อมูล 1 ครั้ง
+    if new_queue_items:
+        QueueItem.objects.bulk_create(new_queue_items)
+        print(f"Bulk Created {len(new_queue_items)} QueueItems from MSSQL Sync.")
 
 def update_queue_status_from_logic():
     """

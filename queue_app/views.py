@@ -42,19 +42,7 @@ def dashboard(request):
     # คิวแทรก (Ad-hoc) ที่กำลัง Active (ถ้ามี จะแสดงแทรกขึ้นมา)
     current_adhoc = items.filter(status__code='ACTIVE', is_adhoc=1).order_by('created_at').first()
 
-    # Helper to attach operator name
-    def attach_operator_name(queue_item):
-        if queue_item and queue_item.linked_job_no:
-             try:
-                 job = JobsBms.objects.get(jobno=queue_item.linked_job_no)
-                 queue_item.operator_name = job.name
-             except JobsBms.DoesNotExist:
-                 queue_item.operator_name = None
-    
-    attach_operator_name(current_queue)
-    attach_operator_name(current_adhoc)
-    
-    # --- Logic การกรองข้อมูล (Filter) ---
+    # เราจะจัดการ Operator name หลังจากการแบ่งหน้า (Pagination) เพื่อให้ Query เฉพาะหน้าที่แสดงผล
     status_filter = request.GET.get('status', 'waiting') # รับค่าจาก URL parameter
     search_query = request.GET.get('q', '') # รับค่าค้นหา
     
@@ -105,6 +93,31 @@ def dashboard(request):
         except Exception as e:
             print(f"Error calculating ranks: {e}")
 
+    # --- Optimize N+1 Query การดึงชื่อช่างและหมายเหตุ BMS ---
+    linked_job_nos = set()
+    for item in queue_list:
+        if item.linked_job_no:
+            linked_job_nos.add(item.linked_job_no)
+    if current_queue and current_queue.linked_job_no:
+        linked_job_nos.add(current_queue.linked_job_no)
+    if current_adhoc and current_adhoc.linked_job_no:
+        linked_job_nos.add(current_adhoc.linked_job_no)
+        
+    # ดึง JobsBms รวดเดียวทีเดียว (เฉพาะที่มีในหน้านี้) ลดการยิง DB แบบ N+1
+    jobs_dict = {job.jobno: job for job in JobsBms.objects.filter(jobno__in=linked_job_nos)}
+    
+    def attach_job_info(queue_item):
+        if queue_item:
+            job = jobs_dict.get(queue_item.linked_job_no)
+            queue_item.operator_name = job.name if job else None
+            # แคช note ไว้ใน attribute ชั่วคราวเพื่อให้ models.py หยิบไปใช้ได้โดยไม่ต้อง query ใหม่
+            queue_item._cached_bms_note = job.note if job else ''
+
+    attach_job_info(current_queue)
+    attach_job_info(current_adhoc)
+    for item in queue_list:
+        attach_job_info(item)
+
     # --- ตรวจสอบสิทธิ์ Admin (Based on Hostname/IP) ---
     is_admin_computer = False
     client_ip = get_client_ip(request)
@@ -125,12 +138,7 @@ def dashboard(request):
     # if client_ip == '127.0.0.1':
     #     is_admin_computer = True
 
-    # --- Logic ตรวจสอบและปิดกะอัตโนมัติ (Auto-Close Shift) ---
-    # เรียกใช้ Logic เดียวกับ Background Task เพื่อให้ปิดทันทีถ้ามีการ Refresh หน้าจอ
-    try:
-        auto_close_shift_logic()
-    except Exception as e:
-        print(f"Error in auto_close_shift_logic from view: {e}")
+    # --- ลบออก: ไม่ต้องรัน Auto-Close ใน View แล้ว ให้ Scheduler เบื้องหลังทำงานแทนเพื่อประหยัดทรัพยากร ---
 
     # --- สรุปสถานะการปิดกะเพื่อส่งไปที่ Template ---
     is_shift_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
