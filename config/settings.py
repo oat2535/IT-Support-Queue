@@ -155,7 +155,7 @@ STATICFILES_DIRS = [
 
 # สำหรับ HTTPS
 # หมายเหตุ: ใน Local Development เราปิด Secure Cookies เพื่อให้ใช้งานผ่าน IP ได้สะดวก
-CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com', 'http://192.168.1.33', 'http://192.168.98.252:5679']
+CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com', 'http://192.168.1.33', 'http://192.168.98.252:5679', 'https://e-taskflow.thonglopet.com']
 SESSION_COOKIE_SECURE = False # ควรเป็น True บน Production (HTTPS)
 CSRF_COOKIE_SECURE = False # ควรเป็น True บน Production (HTTPS)
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None # ปิดเพื่อลด Warning ใน Local Dev (IP Access)
