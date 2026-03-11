@@ -65,11 +65,15 @@ def dashboard(request):
 
     # --- Logic การค้นหา (Search) ---
     if search_query:
-        queue_list = queue_list.filter(
-            Q(issue_description__icontains=search_query) | 
-            Q(user_name__icontains=search_query) |
-            Q(queue_number__icontains=search_query)
-        )
+        # Split search query by spaces to allow "word1 word2" searches
+        search_words = search_query.split()
+        for word in search_words:
+            # Each word must be in at least one of these columns (AND condition for each word)
+            queue_list = queue_list.filter(
+                Q(issue_description__icontains=word) | 
+                Q(user_name__icontains=word) |
+                Q(queue_number__icontains=word)
+            )
 
     # --- Logic การแบ่งหน้า (Pagination) ---
     paginator = Paginator(queue_list, 5) # แสดง 5 รายการต่อหน้า
