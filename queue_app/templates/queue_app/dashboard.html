@@ -448,6 +448,7 @@
         var IS_ADMIN = "{{ is_admin_computer|yesno:'true,false' }}" === "true";
 
         function openDescModal(id, comment, statusId, bmsNote) {
+            $('[data-toggle="tooltip"]').tooltip('hide');
             /**
              * เปิด Modal บันทึกหมายเหตุ
              * - ถ้าไม่ใช่ Adminจะเป็น Read-only
@@ -548,6 +549,7 @@
         }
         
         function insertQueue(id) {
+            $('[data-toggle="tooltip"]').tooltip('hide');
             Swal.fire({
                 title: 'ต้องการแทรกคิวงานนี้ใช่หรือไม่?',
                 text: "งานนี้จะถูกเปลี่ยนสถานะเป็นกำลังดำเนินการทันที",
@@ -611,6 +613,7 @@
         $(document).on('click', '#call-next-btn', function(e) {
             e.preventDefault();
             var url = $(this).attr('href');
+            $('[data-toggle="tooltip"]').tooltip('hide');
             
             Swal.fire({
                 title: 'ยืนยันเรียกคิวถัดไป?',
@@ -680,6 +683,7 @@
         // Finish Ad-hoc Queue AJAX
         $(document).on('click', '#finish-adhoc-btn', function(e) {
             e.preventDefault();
+            $('[data-toggle="tooltip"]').tooltip('hide');
             
             Swal.fire({
                 title: 'ยืนยันจบงานคิวแทรก?',
