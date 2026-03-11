@@ -493,7 +493,7 @@
                             showConfirmButton: false,
                             timer: 1500
                         }).then(() => {
-                            window.location.reload();
+                            seamlessReload();
                         });
                     } else {
                         Swal.fire({
@@ -566,7 +566,7 @@
                         contentType: 'application/json',
                         success: function(response) {
                             if(response.success) {
-                                window.location.reload();
+                                seamlessReload();
                             } else {
                                 Swal.fire({
                                     icon: 'warning',
@@ -608,7 +608,7 @@
         }
 
         // Call Next Queue AJAX
-        $('#call-next-btn').on('click', function(e) {
+        $(document).on('click', '#call-next-btn', function(e) {
             e.preventDefault();
             var url = $(this).attr('href');
             
@@ -628,7 +628,7 @@
                         type: 'GET',
                         success: function(response) {
                             if (response.success) {
-                                window.location.reload();
+                                seamlessReload();
                             } else {
                                 Swal.fire({
                                     icon: 'warning',
@@ -669,14 +669,16 @@
 
         // Auto Refresh every 1 minute (60,000 ms)
         // Check: ห้าม Refresh ถ้า Modal เปิดอยู่ (เดี๋ยว User พิมพ์ค้างไว้หาย)
-        setInterval(function() {
-            if (!$('.modal').hasClass('show')) {
-                window.location.reload();
-            }
-        }, 60000);
+        if (!window.dashboardRefreshInterval) {
+            window.dashboardRefreshInterval = setInterval(function() {
+                if (!$('.modal').hasClass('show')) {
+                    seamlessReload();
+                }
+            }, 60000);
+        }
         
         // Finish Ad-hoc Queue AJAX
-        $('#finish-adhoc-btn').on('click', function(e) {
+        $(document).on('click', '#finish-adhoc-btn', function(e) {
             e.preventDefault();
             
             Swal.fire({
@@ -698,7 +700,7 @@
                         // Let's use GET since I didn't enforce POST in the python view for this specific function (checked views.py, finish_adhoc_queue doesn't check method `if request.method == 'POST'`).
                         success: function(response) {
                             if (response.success) {
-                                window.location.reload();
+                                seamlessReload();
                             } else {
                                 Swal.fire({
                                     icon: 'warning',

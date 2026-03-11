@@ -191,6 +191,79 @@
                 }
             });
         }
+
+        /**
+         * Seamless Reload: Fetch URL without full page native reload
+         */
+        function seamlessReload(url, pushState = false) {
+            if (!url) url = window.location.href;
+            $.ajax({
+                url: url,
+                type: 'GET',
+                success: function(data) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(data, "text/html");
+                    var container = doc.querySelector('.container-fluid');
+                    
+                    if (container) {
+                        var newHtml = container.innerHTML;
+                        $('.container-fluid').html(newHtml);
+                        // Re-initialize tooltips
+                        if (typeof $.fn.tooltip !== 'undefined') {
+                            $('[data-toggle="tooltip"]').tooltip({ html: true });
+                        }
+                        if (pushState && url !== window.location.href) {
+                            window.history.pushState({path: url}, '', url);
+                        }
+                    } else {
+                        window.location.href = url;
+                    }
+                },
+                error: function() {
+                    window.location.href = url;
+                }
+            });
+        }
+
+        // Intercept internal relative links to prevent flicker
+        $(document).on('click', 'a', function(e) {
+            var href = $(this).attr('href');
+            // Intercept local relative links starting with ? or /
+            if (href && (href.startsWith('?') || href.startsWith(window.location.pathname))) {
+                if ($(this).attr('target') === '_blank') return;
+                
+                e.preventDefault();
+                seamlessReload(href, true);
+            }
+        });
+
+        // Intercept search/filter forms
+        $(document).on('submit', 'form', function(e) {
+            var $form = $(this);
+            if ($form.attr('method') && $form.attr('method').toUpperCase() === 'GET') {
+                e.preventDefault();
+                var url = $form.attr('action') || window.location.pathname;
+                var separator = url.indexOf('?') !== -1 ? '&' : '?';
+                
+                // Keep hash if present
+                var hashIndex = url.indexOf('#');
+                var hash = '';
+                if (hashIndex !== -1) {
+                    hash = url.substring(hashIndex);
+                    url = url.substring(0, hashIndex);
+                }
+                
+                var fullUrl = url + separator + $form.serialize() + hash;
+                // Fix double '?'
+                fullUrl = fullUrl.replace('?&', '?');
+                seamlessReload(fullUrl, true);
+            }
+        });
+
+        // Handle browser Back/Forward navigation smoothly
+        window.addEventListener('popstate', function() {
+            seamlessReload(window.location.href, false);
+        });
     </script>
     {% block extra_js %}{% endblock %}
 
