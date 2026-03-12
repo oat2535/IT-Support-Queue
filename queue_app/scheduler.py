@@ -44,9 +44,10 @@ def auto_close_shift_logic():
 
 
 import atexit
+import signal
 
 def start():
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(daemon=True)
     # ตั้งให้รัน Sync ทุกๆ 1 นาที (ปรับเปลี่ยนได้ตามความเหมาะสม)
     scheduler.add_job(sync_jobs_from_mssql, 'interval', minutes=1, id='sync_mssql_job', replace_existing=True)
     
@@ -59,6 +60,12 @@ def start():
     logger.info("APScheduler started: Syncing MSSQL jobs every 1 minute.")
     logger.info("APScheduler started: Auto-close shift check enabled (21:00 - 06:00, every 5 mins).")
 
-    # Hook into Python's exit process to cleanly stop the scheduler thread 
-    # and avoid throwing KeyboardInterrupt during thread.join()
-    atexit.register(lambda: scheduler.shutdown(wait=False))
+    # Graceful shutdown: ปิด scheduler ก่อนที่ Python จะปิด thread pool
+    def shutdown_scheduler():
+        try:
+            scheduler.shutdown(wait=False)
+        except Exception:
+            pass
+
+    atexit.register(shutdown_scheduler)
+

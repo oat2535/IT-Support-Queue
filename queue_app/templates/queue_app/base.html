@@ -63,7 +63,7 @@
     </div>
 
     <!-- Main Content -->
-    <div class="container-fluid">
+    <div id="main-content" class="container-fluid" data-shift-closed="{{ is_shift_closed|yesno:'true,false' }}">
         {% block content %}{% endblock %}
     </div>
     <!-- /.container-fluid -->
@@ -194,42 +194,91 @@
 
         /**
          * Seamless Reload: Fetch URL without full page native reload
+         * Uses native fetch() API for reliable response handling
          */
-        function seamlessReload(url, pushState = false) {
+        function seamlessReload(url, pushState) {
             if (!url) url = window.location.href;
-            $.ajax({
-                url: url,
-                type: 'GET',
-                success: function(data) {
+            console.log('[seamlessReload] START - Fetching:', url);
+            
+            fetch(url, { cache: 'no-store', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function(response) {
+                    console.log('[seamlessReload] Response status:', response.status);
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    return response.text();
+                })
+                .then(function(data) {
+                    console.log('[seamlessReload] Response text length:', data.length);
+                    
                     var parser = new DOMParser();
-                    var doc = parser.parseFromString(data, "text/html");
-                    var container = doc.querySelector('.container-fluid');
+                    var doc = parser.parseFromString(data, 'text/html');
+                    var container = doc.getElementById('main-content');
+                    
+                    console.log('[seamlessReload] #main-content found:', !!container);
+                    
+                    if (!container) {
+                        // Fallback: try class selector
+                        container = doc.querySelector('.container-fluid');
+                        console.log('[seamlessReload] .container-fluid fallback found:', !!container);
+                    }
                     
                     if (container) {
-                        var newHtml = container.innerHTML;
+                        var shiftAttr = container.getAttribute('data-shift-closed');
+                        console.log('[seamlessReload] data-shift-closed:', shiftAttr, '| IS_SHIFT_CLOSED:', IS_SHIFT_CLOSED);
                         
-                        // Force hide/remove any lingering tooltips before replacing DOM
-                        if (typeof $.fn.tooltip !== 'undefined') {
-                            $('[data-toggle="tooltip"]').tooltip('dispose');
+                        // Dispose tooltips safely
+                        try {
+                            $('.tooltip').remove();
+                            if (typeof $.fn.tooltip !== 'undefined') {
+                                $('[data-toggle="tooltip"]').tooltip('dispose');
+                            }
+                        } catch(e) { /* ignore */ }
+                        
+                        // Replace content
+                        var liveContainer = document.getElementById('main-content');
+                        if (liveContainer) {
+                            liveContainer.innerHTML = container.innerHTML;
+                            liveContainer.setAttribute('data-shift-closed', shiftAttr || 'false');
+                            console.log('[seamlessReload] Content replaced via native DOM');
+                        } else {
+                            // Fallback to jQuery
+                            $('.container-fluid').first().html(container.innerHTML);
+                            console.log('[seamlessReload] Content replaced via jQuery fallback');
                         }
-                        $('.tooltip').remove();
                         
-                        $('.container-fluid').html(newHtml);
                         // Re-initialize tooltips
-                        if (typeof $.fn.tooltip !== 'undefined') {
-                            $('[data-toggle="tooltip"]').tooltip({ html: true });
-                        }
+                        try {
+                            if (typeof $.fn.tooltip !== 'undefined') {
+                                $('[data-toggle="tooltip"]').tooltip({ html: true });
+                            }
+                        } catch(e) { /* ignore */ }
+                        
+                        // Push state if needed
                         if (pushState && url !== window.location.href) {
                             window.history.pushState({path: url}, '', url);
                         }
+                        
+                        // Check shift status change
+                        if (shiftAttr !== null) {
+                            var newShiftClosed = (shiftAttr === 'true');
+                            if (newShiftClosed && !IS_SHIFT_CLOSED) {
+                                console.log('[seamlessReload] SHIFT CLOSED -> showing popup');
+                                IS_SHIFT_CLOSED = true;
+                                showClosedPopup();
+                            } else if (!newShiftClosed && IS_SHIFT_CLOSED) {
+                                console.log('[seamlessReload] SHIFT OPENED -> closing popup');
+                                IS_SHIFT_CLOSED = false;
+                                Swal.close();
+                            }
+                        }
                     } else {
+                        console.warn('[seamlessReload] No container found -> full reload');
                         window.location.href = url;
                     }
-                },
-                error: function() {
+                })
+                .catch(function(err) {
+                    console.error('[seamlessReload] FETCH ERROR:', err);
                     window.location.href = url;
-                }
-            });
+                });
         }
 
         // Intercept internal relative links to prevent flicker
