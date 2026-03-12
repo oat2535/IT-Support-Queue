@@ -238,6 +238,7 @@
             // Intercept local relative links starting with ? or /
             if (href && (href.startsWith('?') || href.startsWith(window.location.pathname))) {
                 if ($(this).attr('target') === '_blank') return;
+                if ($(this).hasClass('no-seamless')) return; // Allow custom AJAX handlers to work
                 
                 e.preventDefault();
                 seamlessReload(href, true);
