@@ -37,7 +37,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY . /app/
 
 # เปิด Port 5679 สำหรับการเชื่อมต่อ
-EXPOSE 5679
+EXPOSE 5886
 
 # คำสั่งเริ่มต้นเมื่อ Container ทำงาน (รัน Server Django)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:5679"]
+CMD ["python", "manage.py", "runserver", "0.0.0.0:5886"]
