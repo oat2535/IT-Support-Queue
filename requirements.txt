@@ -1,0 +1,7 @@
+﻿APScheduler
+Django>=5.1.4
+psycopg2-binary
+pyodbc
+tzdata; sys_platform == 'win32'
+pysmb==1.2.9.1
+
