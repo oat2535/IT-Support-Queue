@@ -56,7 +56,7 @@
             {% if is_admin_computer %}
             <!-- ปุ่มปิดกะ (แสดงเฉพาะ Admin) -->
             <button id="close-shift-btn" class="btn btn-danger btn-sm mr-3 font-weight-bold shadow-sm">
-                <i class="fas fa-store-slash mr-1"></i> ปิดกะ
+                <i class="fas fa-store-slash mr-1"></i> Offline
             </button>
             {% endif %}
             
@@ -108,13 +108,13 @@
             // Event Listener สำหรับปุ่มปิดกะ
             $('#close-shift-btn').on('click', function() {
                 Swal.fire({
-                    title: 'ยืนยันปิดกะ?',
+                    title: 'ยืนยัน Offline ?',
                     text: "คุณต้องการปิดระบบให้บริการใช่หรือไม่ หน้าจอจะถูก Freeze ทันที",
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#e74a3b', // red
                     cancelButtonColor: '#858796', // secondary
-                    confirmButtonText: 'ใช่, ปิดกะเลย',
+                    confirmButtonText: 'ใช่, Offline เลย',
                     cancelButtonText: 'ยกเลิก'
                 }).then((result) => {
                     if (result.isConfirmed) {
@@ -170,12 +170,12 @@
              */
             
             // Content ข้อความที่จะแสดง
-            var contentHtml = 'เวลาให้บริการ 09.00 น. - 21.00 น.<br>หากมีเคสเร่งด่วนรบกวนติดต่อที่เบอร์ 99901';
+            var contentHtml = 'เวลาให้บริการ 08.00 น. - 21.00 น.<br>หากมีเคสเร่งด่วนรบกวนติดต่อที่เบอร์ 55999';
             
             // Footer: ปุ่มเปิดกะสำหรับ Admin เท่านั้น
             var footerContent = '';
             if (IS_ADMIN) {
-                footerContent = '<button class="btn btn-success font-weight-bold py-2 px-4 shadow" onclick="openShift()"><i class="fas fa-store mr-2"></i>เปิดกะ (Open Shift)</button>';
+                footerContent = '<button class="btn btn-success font-weight-bold py-2 px-4 shadow" onclick="openShift()"><i class="fas fa-store mr-2"></i>Online (Open Shift)</button>';
             }
 
             Swal.fire({
@@ -195,13 +195,13 @@
 
         function openShift() {
             Swal.fire({
-                title: 'ยืนยันเปิดกะ?',
+                title: 'ยืนยัน Online ?',
                 text: "ต้องการเริ่มให้บริการตามปกติใช่หรือไม่",
                 icon: 'question',
                 showCancelButton: true,
                 confirmButtonColor: '#1cc88a',
                 cancelButtonColor: '#d33',
-                confirmButtonText: 'ใช่, เปิดกะ',
+                confirmButtonText: 'ใช่, Online',
                 cancelButtonText: 'ยกเลิก'
             }).then((result) => {
                 if (result.isConfirmed) {
