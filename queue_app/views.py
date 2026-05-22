@@ -433,3 +433,43 @@ def toggle_shift_status(request):
              return JsonResponse({'success': False, 'error': str(e)})
              
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@csrf_exempt
+def close_queue_item(request):
+    """
+    API: ปุ่มปิดงานตรงๆ จากหน้ารอประสานงาน
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            item_id = data.get('id')
+            
+            queue_item = QueueItem.objects.get(id=item_id)
+            done_status = QueueStatus.objects.get(code='DONE')
+            
+            # 1. Validation Logic: ตรวจสอบสถานะ BMS
+            if queue_item.linked_job_no:
+                try:
+                    bms_job = JobsBms.objects.get(jobno=queue_item.linked_job_no)
+                    if bms_job.job_status not in ['2', '12']:
+                         return JsonResponse({
+                             'success': False, 
+                             'error': f'ไม่สามารถปิดงานได้ รบกวนปิดงานในระบบ BMS ก่อน (BMS Status: {bms_job.get_job_status_display()})'
+                         })
+                except JobsBms.DoesNotExist:
+                    pass
+
+            # 2. ปิดงาน
+            queue_item.status = done_status
+            queue_item.save()
+            
+            return JsonResponse({'success': True})
+            
+        except QueueItem.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Queue Item not found'})
+        except QueueStatus.DoesNotExist:
+             return JsonResponse({'success': False, 'error': 'Status DONE not found'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+            
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})

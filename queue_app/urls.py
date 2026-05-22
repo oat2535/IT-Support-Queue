@@ -18,6 +18,9 @@ urlpatterns = [
     path('insert-queue/', views.insert_queue_adhoc, name='insert_queue'),
     path('finish-adhoc/', views.finish_adhoc_queue, name='finish_adhoc'),
     
+    # API: ปิดงานตรงจากหน้ารอประสานงาน
+    path('close-queue/', views.close_queue_item, name='close_queue'),
+    
     # API: ระบบปิดกะ (Shift Control)
     path('toggle-shift-status/', views.toggle_shift_status, name='toggle_shift_status'),
 ]
