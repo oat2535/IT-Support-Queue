@@ -181,15 +181,16 @@
             Swal.fire({
                 title: 'ตอนนี้อยู่นอกเวลาการให้บริการของแผนก IT',
                 html: contentHtml,
-                imageUrl: '{% static "img/sleep.jpg" %}',
-                imageWidth: 250,
+                imageUrl: '{% static "img/moon-zzz.svg" %}',
+                imageWidth: 120,
                 allowOutsideClick: false,
                 allowEscapeKey: false,
                 showConfirmButton: false,
                 backdrop: 'rgba(0, 0, 0, 0.98)', // make background dark
                 footer: footerContent,
                 customClass: {
-                    footer: 'border-0 pt-0 pb-4'
+                    footer: 'border-0 pt-0 pb-4',
+                    image: 'border-0 mb-4 mt-2'
                 }
             });
         }

@@ -43,6 +43,24 @@ def auto_close_shift_logic():
                  logger.info(f"Auto-close skipped: OT detected (Open since > {shift_start_check})")
 
 
+def auto_open_shift_logic():
+    """
+    ตรวจสอบและเปิดกะอัตโนมัติ (Auto-Open Shift)
+    ทำงาน: ทุกวัน เวลา 08:00 น.
+    """
+    now = timezone.now()
+    
+    # เช็คว่าปิดอยู่หรือไม่ (ถ้าปิดอยู่ถึงจะเปิด)
+    is_currently_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
+    
+    if is_currently_closed:
+        ShiftClosure.objects.filter(opened_at__isnull=True).update(
+            opened_at=now,
+            opened_by='System (Auto)'
+        )
+        logger.info(f"System Auto-Opened Shift at {now}")
+        print(f"DEBUG: System Auto-Opened Shift at {now}")
+
 import atexit
 import signal
 
@@ -56,9 +74,14 @@ def start():
     # ใช้ cron expression: hour='21-23,0-6'
     scheduler.add_job(auto_close_shift_logic, 'cron', hour='21-23,0-6', minute='*/5', id='auto_close_shift_job', replace_existing=True)
     
+    # เพิ่ม Job สำหรับ Auto Open Shift
+    # รันเวลา 08:00 ของทุกวัน
+    scheduler.add_job(auto_open_shift_logic, 'cron', hour='8', minute='0', id='auto_open_shift_job', replace_existing=True)
+    
     scheduler.start()
     logger.info("APScheduler started: Syncing MSSQL jobs every 30 seconds.")
     logger.info("APScheduler started: Auto-close shift check enabled (21:00 - 06:00, every 5 mins).")
+    logger.info("APScheduler started: Auto-open shift enabled (08:00).")
 
     # Graceful shutdown: ปิด scheduler ก่อนที่ Python จะปิด thread pool
     def shutdown_scheduler():

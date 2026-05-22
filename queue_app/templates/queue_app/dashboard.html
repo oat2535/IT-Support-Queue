@@ -181,6 +181,18 @@
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between bg-white">
                     <h5 class="m-0 font-weight-bold text-dark"><i class="fas fa-list-ol mr-2"></i> {{ list_title }}</h5>
                     <div class="d-flex align-items-center">
+                        {% if is_admin_computer %}
+                            {% if current_adhoc %}
+                            <a href="#" id="finish-adhoc-btn" class="btn btn-warning text-dark font-weight-bold mr-2 shadow-sm d-flex align-items-center no-seamless" style="border-radius: 5px; padding: 6px 15px; font-size: 0.9rem;">
+                                <i class="fas fa-bolt mr-2"></i> จบงานแทรก (Ad-hoc)
+                            </a>
+                            {% endif %}
+                            
+                            <a href="{% url 'call_next' %}" id="call-next-btn" class="btn btn-primary text-white font-weight-bold mr-3 shadow-sm d-flex align-items-center no-seamless" data-active-count="{{ active_count }}" style="border-radius: 5px; padding: 6px 15px; font-size: 0.9rem;">
+                                <i class="fas fa-bullhorn mr-2"></i> เรียกคิวถัดไป
+                            </a>
+                        {% endif %}
+
                         <form class="form-inline mr-2" method="GET" action="#queue-list-section">
                             {% if active_filter %}
                             <!-- คงค่า active_filter ไว้เมื่อ search -->
@@ -363,44 +375,8 @@
       </div>
     </div>
 
-    <!-- Admin Floating Action Button -->
-    {% if is_admin_computer %}
-    <div id="admin-fab-container" class="d-flex flex-column align-items-end" style="position: fixed; bottom: 30px; right: 30px; z-index: 1000;">
-        <!-- Menu Items -->
-        <div id="admin-menu" class="bg-white shadow-lg rounded-lg mb-3" style="width: 250px; border-radius: 12px; border: 1px solid #e3e6f0; display: none; transform-origin: bottom right;">
-            <div class="p-3">
-                <div class="mb-3 text-gray-500 font-weight-bold" style="font-size: 0.9rem;">Admin Tools</div>
-                
-                <a href="{% url 'call_next' %}" id="call-next-btn" class="no-seamless d-flex align-items-center text-dark text-decoration-none mb-3 admin-menu-item" data-active-count="{{ active_count }}">
-                    <div class="mr-3 text-primary font-weight-bold"><i class="fas fa-bullhorn"></i></div>
-                    <div>เรียกคิวถัดไป</div>
-                </a>
-
-                {% if current_adhoc %}
-                <a href="#" id="finish-adhoc-btn" class="no-seamless d-flex align-items-center text-dark text-decoration-none mb-3 admin-menu-item">
-                    <div class="mr-3 text-warning font-weight-bold"><i class="fas fa-bolt"></i></div>
-                    <div>จบงานแทรก (Ad-hoc)</div>
-                </a>
-                {% endif %}
-                
-            </div>
-        </div>
-
-        <!-- FAB Button -->
-        <button id="admin-fab" class="btn btn-primary rounded-circle shadow-lg d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 1.5rem; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);" onclick="toggleAdminMenu()">
-            <i class="fas fa-tools" id="admin-fab-icon"></i>
-        </button>
-    </div>
-    {% endif %}
-
     <!-- Custom Siren Icon Style -->
     <style>
-        .admin-menu-item {
-            transition: all 0.2s ease;
-            padding: 8px;
-            border-radius: 8px;
-        }
-        
         /* Font Awesome Siren/Urgent Icon */
         .urgent-icon-btn {
             font-size: 1.5rem; /* Adjust size as needed */
@@ -593,26 +569,6 @@
                 }
             })
         }
-        
-        function toggleAdminMenu() {
-            /**
-             * จัดการปุ่ม Menu Admin (FAB) ที่มุมขวาล่าง
-             * สลับไอคอนระหว่าง ไขควง <-> กากบาท
-             */
-            var $menu = $('#admin-menu');
-            var $fab = $('#admin-fab');
-            var $icon = $('#admin-fab-icon');
-            
-            if ($menu.is(':visible')) {
-                $menu.fadeOut(200);
-                $fab.css('transform', 'rotate(0deg)');
-                $icon.removeClass('fa-times').addClass('fa-tools');
-            } else {
-                $menu.fadeIn(200);
-                $fab.css('transform', 'rotate(90deg)');
-                $icon.removeClass('fa-tools').addClass('fa-times');
-            }
-        }
 
         // Call Next Queue AJAX
         $(document).on('click', '#call-next-btn', function(e) {
@@ -658,16 +614,6 @@
             });
         });
 
-        
-        // Close menu when clicking outside
-        $(document).click(function(event) { 
-            var $target = $(event.target);
-            if(!$target.closest('#admin-fab-container').length && 
-               $('#admin-menu').is(":visible")) {
-                toggleAdminMenu();
-            }        
-        });
-        
         // Initialize Tooltips
         $(function () {
           $('[data-toggle="tooltip"]').tooltip({
