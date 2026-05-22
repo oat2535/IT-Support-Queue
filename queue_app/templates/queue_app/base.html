@@ -151,7 +151,11 @@
                 contentType: 'application/json',
                 success: function(response) {
                     if(response.success) {
-                        window.location.reload(); // รีโหลดหน้าเพื่อ update state
+                        if (!shouldClose) {
+                            window.location.href = '{% url "dashboard" %}?status=waiting';
+                        } else {
+                            window.location.reload(); // รีโหลดหน้าเพื่อ update state
+                        }
                     } else {
                         Swal.fire('Error', response.error, 'error');
                     }
