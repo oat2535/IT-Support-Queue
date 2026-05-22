@@ -28,7 +28,7 @@ def dashboard(request):
     now = timezone.now()
     waiting_count = items.filter(status__code='WAITING').count()
     active_count = items.filter(status__code='ACTIVE').count()
-    done_count = items.filter(status__code='DONE').count()
+    done_count = items.filter(status__code='DONE', created_at__month=now.month, created_at__year=now.year).count()
     coordinating_count = items.filter(status__code='COORDINATING').count()
     waiting_parts_count = items.filter(status__code='WAITING_PARTS').count()
     
@@ -51,7 +51,7 @@ def dashboard(request):
         list_title = "รายการที่กำลังดำเนินการ (Active)"
     elif status_filter == 'done':
         # เรียงลำดับคิวที่เสร็จแล้ว เอาที่เพิ่งเสร็จขึ้นก่อน (อิงจาก created_at หรือถ้าเพิ่ม updated_at ค่อยแก้ภายหลัง) 
-        queue_list = items.filter(status__code='DONE').order_by('-created_at')
+        queue_list = items.filter(status__code='DONE', created_at__month=now.month, created_at__year=now.year).order_by('created_at')
         list_title = "รายการที่เสร็จสิ้น (Done)"
     elif status_filter == 'pending':
         queue_list = items.filter(status__code__in=['COORDINATING', 'WAITING_PARTS']).order_by('created_at')

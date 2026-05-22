@@ -272,7 +272,7 @@
                                     <span class="badge badge-{{ item.status.color|default:'secondary' }}">{{ item.status.name }}</span>
                                     {% if is_admin_computer and active_filter == 'pending' %}
                                         <button class="btn btn-sm btn-outline-success ml-2 py-0 px-2" style="font-size: 0.8rem; border-radius: 12px;" onclick="closeQueueItem('{{ item.id }}')" title="เสร็จสิ้น" data-toggle="tooltip">
-                                            <i class="fas fa-check"></i> เสร็จสิ้น
+                                            <i class="fas fa-check"></i> ปิดงาน
                                         </button>
                                     {% endif %}
                                 </td>
