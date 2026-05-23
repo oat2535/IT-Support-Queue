@@ -81,11 +81,21 @@
     <script>
         function updateClock() {
             var now = new Date();
+            
+            var days = ['วันอาทิตย์ที่', 'วันจันทร์ที่', 'วันอังคารที่', 'วันพุธที่', 'วันพฤหัสบดีที่', 'วันศุกร์ที่', 'วันเสาร์ที่'];
+            var months = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+            var dayName = days[now.getDay()];
+            var date = now.getDate();
+            var monthName = months[now.getMonth()];
+            var year = now.getFullYear() + 543;
+            var dateString = dayName + ' ' + date + ' ' + monthName + ' ' + year;
+
             var hours = String(now.getHours()).padStart(2, '0');
             var minutes = String(now.getMinutes()).padStart(2, '0');
             var seconds = String(now.getSeconds()).padStart(2, '0');
+            
             if (document.getElementById('clock')) {
-                document.getElementById('clock').textContent = hours + ':' + minutes + ':' + seconds;
+                document.getElementById('clock').textContent = dateString + '  เวลา : ' + hours + ':' + minutes + ':' + seconds;
             }
         }
         setInterval(updateClock, 1000);
