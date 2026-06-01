@@ -134,7 +134,7 @@ def dashboard(request):
     if hostname:
         current_hostname = hostname.upper()
         # รายชื่อเครื่องที่อนุญาตให้เป็น Admin (เช็คแบบ Case-Insensitive)
-        admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24', 'OAT-IT', 'DESKTOP-PE0U0G1', 'IT-TEMP-0001', 'B-IT-0123', 'VPN/Unknown (172.18.100.176)', 'VPN/Unknown (172.18.101.69)'] 
+        admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24', 'OAT-IT', 'DESKTOP-PE0U0G1', 'IT-TEMP-0001', 'B-IT-0123', 'VPN/Unknown (172.18.100.176)', 'VPN/Unknown (172.18.234.4)'] 
         
         # ตรวจสอบว่า hostname อยู่ใน list หรือไม่ (แปลงเป็น Upper case ทั้งหมด)
         if current_hostname in [h.upper() for h in admin_hosts]:
