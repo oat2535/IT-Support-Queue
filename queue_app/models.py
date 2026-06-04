@@ -183,3 +183,15 @@ class JobsBms(models.Model):
 
     def __str__(self):
         return f"{self.jobno} - {self.description[:30]}"
+
+class Members(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    password = models.CharField(max_length=128)
+    username = models.CharField(unique=True, max_length=150)
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    is_staff = models.IntegerField()
+
+    class Meta:
+        managed = False
+        db_table = 'members'

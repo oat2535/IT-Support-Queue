@@ -23,4 +23,8 @@ urlpatterns = [
     
     # API: ระบบปิดกะ (Shift Control)
     path('toggle-shift-status/', views.toggle_shift_status, name='toggle_shift_status'),
+    
+    # API: ระบบ Authentication สำหรับ Member
+    path('login-member/', views.login_member, name='login_member'),
+    path('logout-member/', views.logout_member, name='logout_member'),
 ]

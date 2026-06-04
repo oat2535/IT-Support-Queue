@@ -49,6 +49,15 @@
             <button id="get-info-btn" class="btn btn-light btn-sm ml-3 shadow-sm font-weight-bold" style="border-radius: 20px; margin-top: 8px; color: #1a237e;">
                 <i class="fas fa-info-circle mr-1"></i> Get Info
             </button>
+            {% if logged_in_member %}
+            <button id="logout-btn" class="btn btn-danger btn-sm ml-2 shadow-sm font-weight-bold" style="border-radius: 20px; margin-top: 8px;">
+                <i class="fas fa-sign-out-alt mr-1"></i> Logout ({{ logged_in_member }})
+            </button>
+            {% else %}
+            <button id="login-btn" class="btn btn-primary btn-sm ml-2 shadow-sm font-weight-bold" style="border-radius: 20px; margin-top: 8px;">
+                <i class="fas fa-sign-in-alt mr-1"></i> Login
+            </button>
+            {% endif %}
         </div>
         
         <!-- ฝั่งขวา: นาฬิกาและปุ่มจัดการกะ -->
@@ -146,6 +155,69 @@
                     icon: 'info',
                     confirmButtonColor: '#2e59d9',
                     confirmButtonText: 'ปิด'
+                });
+            });
+
+            // Login button handler
+            $('#login-btn').on('click', function() {
+                Swal.fire({
+                    title: 'Login',
+                    html:
+                        '<input id="swal-input-username" class="swal2-input" placeholder="Username">' +
+                        '<input id="swal-input-password" class="swal2-input" placeholder="Password" type="password">',
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Login',
+                    preConfirm: () => {
+                        const username = document.getElementById('swal-input-username').value;
+                        const password = document.getElementById('swal-input-password').value;
+                        if (!username || !password) {
+                            Swal.showValidationMessage('กรุณากรอก Username และ Password');
+                        }
+                        return { username: username, password: password };
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $.ajax({
+                            url: '{% url "login_member" %}',
+                            type: 'POST',
+                            data: JSON.stringify(result.value),
+                            contentType: 'application/json',
+                            success: function(response) {
+                                if(response.success) {
+                                    window.location.reload();
+                                } else {
+                                    Swal.fire('Error', response.error, 'error');
+                                }
+                            },
+                            error: function() {
+                                Swal.fire('Error', 'Connection Error', 'error');
+                            }
+                        });
+                    }
+                });
+            });
+
+            // Logout button handler
+            $('#logout-btn').on('click', function() {
+                Swal.fire({
+                    title: 'ยืนยัน Logout',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e74a3b',
+                    confirmButtonText: 'Logout'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $.ajax({
+                            url: '{% url "logout_member" %}',
+                            type: 'POST',
+                            success: function(response) {
+                                if(response.success) {
+                                    window.location.reload();
+                                }
+                            }
+                        });
+                    }
                 });
             });
         });

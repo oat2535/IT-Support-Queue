@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Q
-from .models import QueueItem, QueueStatus, JobsBms, ShiftClosure
+from django.contrib.auth.hashers import check_password
+from .models import QueueItem, QueueStatus, JobsBms, ShiftClosure, Members
 from .utils import sync_jobs_from_mssql, get_hostname_from_ip, get_client_ip 
 # การ Sync ข้อมูลถูกจัดการโดย management command แล้ว: python manage.py import_job_analysis
 from django.views.decorators.csrf import csrf_exempt
@@ -123,23 +124,27 @@ def dashboard(request):
     for item in queue_list:
         attach_job_info(item)
 
-    # --- ตรวจสอบสิทธิ์ Admin (Based on Hostname/IP) ---
+    # --- ตรวจสอบสิทธิ์ Admin ---
     is_admin_computer = False
+    
+    # 1. ตรวจสอบจาก Login Session เป็นหลัก (ให้ยึดจาก User ที่ล็อกอิน)
+    if request.session.get('is_staff') == 1:
+        is_admin_computer = True
+
+    # ดึง IP และ Hostname เสมอ เพื่อใช้แสดงในปุ่ม Get Info
     client_ip = get_client_ip(request)
-    
-    # ใช้ Caching Helper เพื่อลดความหน่วง
     hostname = get_hostname_from_ip(client_ip)
-    print(f"Client IP: {client_ip}, Hostname: {hostname}")
     
-    if hostname:
-        current_hostname = hostname.upper()
-        # รายชื่อเครื่องที่อนุญาตให้เป็น Admin (เช็คแบบ Case-Insensitive)
-        admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24', 'OAT-IT', 'DESKTOP-PE0U0G1', 'IT-TEMP-0001', 'B-IT-0123', 'VPN/Unknown (172.18.100.176)', 'VPN/Unknown (172.18.101.97)'] 
-        
-        # ตรวจสอบว่า hostname อยู่ใน list หรือไม่ (แปลงเป็น Upper case ทั้งหมด)
-        if current_hostname in [h.upper() for h in admin_hosts]:
-             is_admin_computer = True
-             
+    # 2. Fallback to IP/Hostname check (คอมเมนต์ไว้เผื่ออนาคต)
+    # if hostname:
+    #     current_hostname = hostname.upper()
+    #     # รายชื่อเครื่องที่อนุญาตให้เป็น Admin (เช็คแบบ Case-Insensitive)
+    #     admin_hosts = ['DESKTOP-TIC1FOD', 'B-IT-24', 'OAT-IT', 'DESKTOP-PE0U0G1', 'IT-TEMP-0001', 'B-IT-0123', 'VPN/Unknown (172.18.100.176)', 'VPN/Unknown (172.18.101.97)'] 
+    #     
+    #     # ตรวจสอบว่า hostname อยู่ใน list หรือไม่ (แปลงเป็น Upper case ทั้งหมด)
+    #     if current_hostname in [h.upper() for h in admin_hosts]:
+    #          is_admin_computer = True
+    #          
     # if client_ip == '127.0.0.1':
     #     is_admin_computer = True
 
@@ -148,6 +153,10 @@ def dashboard(request):
     # --- สรุปสถานะการปิดกะเพื่อส่งไปที่ Template ---
     is_shift_closed = ShiftClosure.objects.filter(opened_at__isnull=True).exists()
     
+    first_name = request.session.get('first_name', '')
+    last_name = request.session.get('last_name', '')
+    full_name = f"{first_name} {last_name}".strip()
+
     context = {
         'waiting_count': waiting_count,
         'active_count': active_count,
@@ -165,6 +174,7 @@ def dashboard(request):
         'is_shift_closed': is_shift_closed,
         'client_ip': client_ip,
         'client_hostname': hostname,
+        'logged_in_member': full_name if full_name else None,
     }
     
     return render(request, 'queue_app/dashboard.html', context)
@@ -473,4 +483,40 @@ def close_queue_item(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
             
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@csrf_exempt
+def login_member(request):
+    """
+    API: เข้าสู่ระบบผ่าน table members
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            username = data.get('username')
+            password = data.get('password')
+            
+            member = Members.objects.filter(username=username).first()
+            if member and check_password(password, member.password):
+                request.session['member_id'] = member.id
+                request.session['is_staff'] = member.is_staff
+                request.session['first_name'] = member.first_name
+                request.session['last_name'] = member.last_name
+                return JsonResponse({'success': True, 'first_name': member.first_name})
+            else:
+                return JsonResponse({'success': False, 'error': 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'})
+                
+        except Exception as e:
+             return JsonResponse({'success': False, 'error': str(e)})
+             
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@csrf_exempt
+def logout_member(request):
+    """
+    API: ออกจากระบบ
+    """
+    if request.method == 'POST':
+        request.session.flush()
+        return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
