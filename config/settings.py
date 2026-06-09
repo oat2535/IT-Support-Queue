@@ -159,6 +159,11 @@ CSRF_TRUSTED_ORIGINS = ['https://example.com', 'https://www.example.com', 'http:
 SESSION_COOKIE_SECURE = False # ควรเป็น True บน Production (HTTPS)
 CSRF_COOKIE_SECURE = False # ควรเป็น True บน Production (HTTPS)
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None # ปิดเพื่อลด Warning ใน Local Dev (IP Access)
+CSP_FRAME_ANCESTORS = (
+    "'self'",
+    "http://imedx-uat.thonglorpet.com:9444",   # เผื่อกรณีรันผ่าน HTTP
+    "https://imedx-uat.thonglorpet.com:9444",  # สำหรับกรณีรันผ่าน HTTPS
+)
 
 # ประเภทของ Auto-field (Primary Key) เริ่มต้น
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
