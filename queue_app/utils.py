@@ -141,7 +141,11 @@ def get_mssql_connection():
     if not drivers:
         print("No SQL Server ODBC drivers found!")
         return None
-    driver = drivers[0]
+    
+    # เลือกรุ่นใหม่กว่า (เช่น ODBC Driver 17/18) ก่อนรุ่นเก่า (SQL Server legacy driver)
+    # เพราะรุ่นเก่าอาจมีปัญหากับ TrustServerCertificate
+    newer_drivers = [d for d in drivers if 'ODBC Driver' in d]
+    driver = newer_drivers[-1] if newer_drivers else drivers[0]
     
     # สร้าง Connection String (รองรับ TrustServerCertificate สำหรับ Self-signed SSL)
     conn_str = f'DRIVER={{{driver}}};SERVER={server};DATABASE={database};UID={username};PWD={password};TrustServerCertificate=yes'
