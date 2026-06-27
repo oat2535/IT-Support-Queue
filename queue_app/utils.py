@@ -131,7 +131,7 @@ def get_mssql_connection():
     หน้าที่: สร้าง Connection String เพื่อเชื่อมต่อไปยัง Server BMS (ระบบแจ้งซ่อมเก่า)
     """
     # รายละเอียดการเชื่อมต่อ MSSQL
-    server = '192.168.99.224' 
+    server = '173.16.200.103' 
     database = 'BMSDB' 
     username = 'kanchana_a' 
     password = 'Bms@2025' 
