@@ -423,11 +423,18 @@ def update_queue_status_from_logic():
     except QueueStatus.DoesNotExist:
         pass
 
-@lru_cache(maxsize=128)
+from django.core.cache import cache
+
 def get_hostname_from_ip(ip_address):
+    cache_key = f"hostname_{ip_address}"
+    cached_hostname = cache.get(cache_key)
+    if cached_hostname:
+        return cached_hostname
+
     # 1. ลองหาผ่าน DNS ดูก่อน (แบบเดิม)
     try:
         hostname, _, _ = socket.gethostbyaddr(ip_address)
+        cache.set(cache_key, hostname, timeout=300) # Cache 5 นาที
         return hostname
     except Exception:
         pass
@@ -440,12 +447,15 @@ def get_hostname_from_ip(ip_address):
         bios.close()
         
         if names:
+            cache.set(cache_key, names[0], timeout=300)
             return names[0] # คืนค่าชื่อคอมพิวเตอร์ที่ได้กลับมา
     except Exception:
         pass
         
     # 3. ถ้าหาด้วยวิธีไหนก็ไม่เจอจริงๆ คืนค่าเป็นหมายเลข IP แทน
-    return f"VPN/Unknown ({ip_address})"
+    fallback_name = f"VPN/Unknown ({ip_address})"
+    cache.set(cache_key, fallback_name, timeout=300)
+    return fallback_name
 
 def get_client_ip(request):
     """
