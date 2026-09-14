@@ -110,7 +110,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'tlph',
         'USER': 'eservices',
-        'PASSWORD': 'Tlp@2026',
+        'PASSWORD': 'Tlph@2026',
         'HOST': '192.168.99.38',
         'PORT': '5435',
         'OPTIONS': {
