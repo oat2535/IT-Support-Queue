@@ -89,14 +89,29 @@ WSGI_APPLICATION = 'config.wsgi.application'
 #     }
 # }
 
-# ฐานข้อมูล Code7
+# ฐานข้อมูล Code7_Old (เดิม)
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'tlph',
+#         'USER': 'eservices',
+#         'PASSWORD': 'Tlp@2023',
+#         'HOST': '173.16.200.35',
+#         'PORT': '5435',
+#         'OPTIONS': {
+#             'options': '-c search_path=intra_tl'
+#         },
+#     }
+# }
+
+# ฐานข้อมูล Code7_Old (ใหม่)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'tlph',
         'USER': 'eservices',
-        'PASSWORD': 'Tlp@2023',
-        'HOST': '173.16.200.35',
+        'PASSWORD': 'Tlp@2026',
+        'HOST': '192.168.99.38',
         'PORT': '5435',
         'OPTIONS': {
             'options': '-c search_path=intra_tl'
