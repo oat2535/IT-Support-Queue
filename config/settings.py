@@ -111,7 +111,7 @@ DATABASES = {
         'NAME': 'tlph',
         'USER': 'eservices',
         'PASSWORD': 'Tlph@2026',
-        'HOST': '192.168.99.38',
+        'HOST': '192.168.99.39',
         'PORT': '5435',
         'OPTIONS': {
             'options': '-c search_path=intra_tl'
