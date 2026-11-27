@@ -44,6 +44,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'first_name' => $member->first_name,
+            'is_staff' => (int) $member->is_staff === 1,
         ]);
     }
 

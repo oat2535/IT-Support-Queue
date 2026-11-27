@@ -350,10 +350,12 @@
         }
 
         function showClosedPopup() {
-            const contentHtml = 'เวลาให้บริการ 08.00 น. - 21.00 น.<br>หากมีเคสเร่งด่วนรบกวนติดต่อที่เบอร์ 55999';
+            const contentHtml = '<div class="text-muted mb-2 fs-6">เวลาให้บริการ 08.00 น. - 21.00 น.</div>' +
+                '<div class="text-danger fw-semibold">หากมีเคสเร่งด่วนรบกวนติดต่อที่เบอร์ <span class="badge bg-danger fs-6 px-2 py-1">55999</span></div>';
+            
             const footerContent = window.IS_STAFF
-                ? '<button class="btn btn-success fw-bold py-2 px-4 shadow" onclick="openShift()"><i class="fas fa-store me-2"></i>Online (Open Shift)</button>'
-                : '';
+                ? '<button class="btn btn-success fw-bold py-2 px-4 shadow rounded-pill" onclick="openShift()"><i class="fas fa-store me-2"></i>Online (เปิดกะให้บริการ)</button>'
+                : '<button class="btn btn-primary fw-semibold py-2 px-4 shadow-sm rounded-pill" onclick="promptStaffLoginFromClosedPopup()"><i class="fas fa-sign-in-alt me-2"></i>เจ้าหน้าที่เข้าสู่ระบบ (Staff Login)</button>';
 
             Swal.fire({
                 title: 'ตอนนี้อยู่นอกเวลาการให้บริการของแผนก IT',
@@ -369,6 +371,115 @@
                     footer: 'border-0 pt-0 pb-4',
                     image: 'border-0 mb-4 mt-2',
                 },
+            });
+        }
+
+        function promptStaffLoginFromClosedPopup() {
+            Swal.fire({
+                title: 'เจ้าหน้าที่เข้าสู่ระบบ',
+                html:
+                    '<div class="text-start small text-muted mb-3">กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าหน้าที่ IT เพื่อเปิดกะให้บริการ</div>' +
+                    '<div class="mb-3 text-start">' +
+                        '<label class="form-label small fw-semibold text-secondary">Username</label>' +
+                        '<input id="swal-closed-username" class="swal2-input m-0 w-100" placeholder="ชื่อผู้ใช้งาน" autocomplete="username">' +
+                    '</div>' +
+                    '<div class="mb-2 text-start">' +
+                        '<label class="form-label small fw-semibold text-secondary">Password</label>' +
+                        '<input id="swal-closed-password" type="password" class="swal2-input m-0 w-100" placeholder="รหัสผ่าน" autocomplete="current-password">' +
+                    '</div>',
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fas fa-sign-in-alt me-1"></i> เข้าสู่ระบบ',
+                cancelButtonText: 'กลับ',
+                confirmButtonColor: '#0061f2',
+                cancelButtonColor: '#6c757d',
+                customClass: {
+                    confirmButton: 'rounded-pill px-4',
+                    cancelButton: 'rounded-pill px-4',
+                },
+                preConfirm: () => {
+                    const usernameInput = document.getElementById('swal-closed-username');
+                    const passwordInput = document.getElementById('swal-closed-password');
+                    const username = usernameInput ? usernameInput.value.trim() : '';
+                    const password = passwordInput ? passwordInput.value : '';
+                    if (!username || !password) {
+                        Swal.showValidationMessage('กรุณากรอก Username และ Password');
+                        return false;
+                    }
+                    return { username, password };
+                },
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'กำลังเข้าสู่ระบบ...',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        showConfirmButton: false,
+                        didOpen: () => Swal.showLoading(),
+                    });
+
+                    apiFetch(window.QUEUE_ROUTES.loginMember, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value),
+                    })
+                        .then((res) => res.json())
+                        .then((response) => {
+                            if (response.success) {
+                                if (!response.is_staff) {
+                                    Swal.fire({
+                                        icon: 'warning',
+                                        title: 'ไม่มีสิทธิ์เจ้าหน้าที่',
+                                        text: 'บัญชีนี้ไม่มีสิทธิ์เปิดหรือปิดกะให้บริการ',
+                                        confirmButtonText: 'ตกลง',
+                                        confirmButtonColor: '#0061f2',
+                                    }).then(() => showClosedPopup());
+                                    return;
+                                }
+
+                                window.IS_STAFF = true;
+
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'เข้าสู่ระบบสำเร็จ',
+                                    text: `ยินดีต้อนรับ ${response.first_name || 'เจ้าหน้าที่'} ต้องการเปิดกะให้บริการทันทีใช่หรือไม่?`,
+                                    showCancelButton: true,
+                                    confirmButtonText: '<i class="fas fa-store me-1"></i> เปิดกะทันที (Online)',
+                                    cancelButtonText: 'ยังไม่เปิดกะ',
+                                    confirmButtonColor: '#00ac69',
+                                    cancelButtonColor: '#6c757d',
+                                    customClass: {
+                                        confirmButton: 'rounded-pill px-4',
+                                        cancelButton: 'rounded-pill px-4',
+                                    },
+                                }).then((openRes) => {
+                                    if (openRes.isConfirmed) {
+                                        toggleShift(false);
+                                    } else {
+                                        showClosedPopup();
+                                    }
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'เข้าสู่ระบบไม่สำเร็จ',
+                                    text: response.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง',
+                                    confirmButtonText: 'ลองใหม่',
+                                    confirmButtonColor: '#0061f2',
+                                }).then(() => promptStaffLoginFromClosedPopup());
+                            }
+                        })
+                        .catch(() => {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง',
+                                confirmButtonText: 'ตกลง',
+                            }).then(() => showClosedPopup());
+                        });
+                } else {
+                    showClosedPopup();
+                }
             });
         }
 

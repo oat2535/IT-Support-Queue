@@ -73,9 +73,28 @@ class AuthAndShiftParityTest extends TestCase
         $ok->assertOk()->assertJson([
             'success' => true,
             'first_name' => 'Oat',
+            'is_staff' => true,
         ]);
         $ok->assertSessionHas('member_id', $member->id);
         $ok->assertSessionHas('is_staff', 1);
+
+        // Non-staff member login reports is_staff = false
+        Member::create([
+            'username' => 'guest_user',
+            'password' => $this->makeDjangoPbkdf2Hash('GuestPass!'),
+            'first_name' => 'Guest',
+            'last_name' => 'User',
+            'is_staff' => 0,
+        ]);
+        $guestLogin = $this->postJson('/login-member/', [
+            'username' => 'guest_user',
+            'password' => 'GuestPass!',
+        ]);
+        $guestLogin->assertOk()->assertJson([
+            'success' => true,
+            'first_name' => 'Guest',
+            'is_staff' => false,
+        ]);
 
         // Logout clears session
         $logout = $this->postJson('/logout-member/');
