@@ -1,0 +1,28 @@
+{
+    {$CADDY_GLOBAL_OPTIONS}
+
+    frankenphp {
+        {$FRANKENPHP_CONFIG}
+    }
+
+    servers {
+        trusted_proxies static private_ranges 127.0.0.1/8 ::1
+    }
+}
+
+:8000 {
+    log {
+        output stdout
+        format console
+        level INFO
+    }
+
+    root * /app/public
+    encode zstd br gzip
+
+    request_body {
+        max_size 32MB
+    }
+
+    php_server
+}

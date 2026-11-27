@@ -1,19 +1,58 @@
-version: '3.8'
-
 services:
   web:
-    build: .
+    container_name: it-support-queue-web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 15s
     ports:
-      - "5886:5886"
-    # ใช้ environment variables ในการตั้งค่า (สามารถเพิ่ม SECRET_KEY หรือ DB_PASSWORD ที่นี่ได้ในอนาคต)
+      - "5886:8000"
     environment:
-      - DEBUG=1
-    # ตั้งค่าให้ log output แสดงผลทันที (ไม่ buffer)
-    tty: true
-    stdin_open: true
-    networks:
-      - app_network
+      APP_NAME: "${APP_NAME:-IT Smart Queue}"
+      APP_ENV: "${APP_ENV:-production}"
+      APP_KEY: "${APP_KEY:-}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_TIMEZONE: "${APP_TIMEZONE:-Asia/Bangkok}"
+      APP_LOCALE: "${APP_LOCALE:-th}"
+      APP_URL: "${APP_URL:-http://q.thonglorpet.com:5886}"
+      SERVER_NAME: ":8000"
 
-networks:
-  app_network:
-    driver: bridge
+      SESSION_DRIVER: "${SESSION_DRIVER:-file}"
+      SESSION_LIFETIME: "${SESSION_LIFETIME:-120}"
+      SESSION_SAME_SITE: "${SESSION_SAME_SITE:-lax}"
+      SESSION_SECURE_COOKIE: "${SESSION_SECURE_COOKIE:-false}"
+      CACHE_STORE: "${CACHE_STORE:-file}"
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-sync}"
+
+      DB_CONNECTION: "${DB_CONNECTION:-pgsql}"
+      DB_HOST: "${DB_HOST:-192.168.99.39}"
+      DB_PORT: "${DB_PORT:-5435}"
+      DB_DATABASE: "${DB_DATABASE:-tlph}"
+      DB_USERNAME: "${DB_USERNAME:-eservices}"
+      DB_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      DB_SCHEMA: "${DB_SCHEMA:-intra_tl}"
+      DB_TIMEZONE: "${DB_TIMEZONE:-Asia/Bangkok}"
+
+      BMS_DB_HOST: "${BMS_DB_HOST:-173.16.200.103}"
+      BMS_DB_PORT: "${BMS_DB_PORT:-1433}"
+      BMS_DB_DATABASE: "${BMS_DB_DATABASE:-BMSDB}"
+      BMS_DB_USERNAME: "${BMS_DB_USERNAME:-kanchana_a}"
+      BMS_DB_PASSWORD: "${BMS_DB_PASSWORD:?BMS_DB_PASSWORD is required}"
+      BMS_DB_ENCRYPT: "${BMS_DB_ENCRYPT:-no}"
+      BMS_DB_TRUST_SERVER_CERTIFICATE: "${BMS_DB_TRUST_SERVER_CERTIFICATE:-true}"
+
+      CSP_FRAME_ANCESTORS: "${CSP_FRAME_ANCESTORS:-self http://imedx-uat.thonglorpet.com:9444 https://imedx-uat.thonglorpet.com:9444}"
+      RUN_SCHEDULER: "${RUN_SCHEDULER:-true}"
+    volumes:
+      - queue_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  queue_storage:
+    name: it-support-queue-storage

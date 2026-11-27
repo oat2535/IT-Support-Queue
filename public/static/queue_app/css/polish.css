@@ -1,0 +1,276 @@
+/* E-Budget visual polish layer.
+   Loaded after styles.css and theme-override.css so it wins any
+   specificity ties without needing !important. Purely additive:
+   nothing here changes layout, only transitions/entrance motion. */
+
+/* --- Smooth theme switching (light/dark/flat) instead of an instant flash --- */
+body,
+.card,
+.top-navbar,
+.topnav,
+.sidenav-light,
+#layoutSidenav_nav,
+table,
+.datatable-table,
+.modal-content,
+.dropdown-menu,
+.jexcel,
+.jexcel > tbody > tr > td,
+.jexcel > thead > tr > td {
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.form-control,
+.form-select {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+/* --- Smoother "Add Budget" sidenav collapse --- */
+/* Three rounds of tuning .collapsing's height transition (duration, then
+   easing curve) never fully fixed the "stiff" feel, because `height` is a
+   layout property — the browser reflows it every frame, it's never handed
+   to the compositor the way transform/opacity are, so no easing curve can
+   make it truly smooth. Checked the vendored SB Admin Pro theme in full
+   (every dist/*.html page, styles.css, scripts.js, including dashboard-1's
+   multi-level sidenav accordion) — the theme never solves this either, it's
+   stock Bootstrap `.collapsing { height 0.15s ease }` everywhere. So instead
+   of animating height at all, base.html's #collapseAddBudget is now toggled
+   via plain JS (not data-bs-toggle="collapse") and this animates
+   grid-template-rows on a wrapper instead. */
+
+/* Chevron rotation still keys off .collapsed on the trigger link (unchanged
+   vendor CSS in styles.css ~line 18585) — just toggled by our own JS now
+   instead of Bootstrap's. Reuse the theme's own reveal curve
+   (cubic-bezier(0, 1, 0.4, 1), from .animated--fade-in-up/.animated--fade-in
+   in styles.css ~line 15107) so the arrow's motion still matches the
+   panel's and the rest of the theme's motion language. */
+.sidenav .sidenav-menu .nav .nav-link .sidenav-collapse-arrow {
+    transition: transform 0.3s cubic-bezier(0, 1, 0.4, 1);
+}
+
+/* Grid-based collapse: animates grid-template-rows (0fr -> 1fr) instead of
+   height. The inner wrapper needs overflow:hidden + min-height:0 so a 0fr
+   row can actually clip its content instead of the content forcing the row
+   to stay content-sized. */
+.eb-collapse {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s cubic-bezier(0, 1, 0.4, 1);
+}
+.eb-collapse.eb-collapse-open {
+    grid-template-rows: 1fr;
+}
+.eb-collapse > div {
+    overflow: hidden;
+    min-height: 0;
+    /* Frame-by-frame review of screen recordings showed the real remaining
+       issue: grid-template-rows growth is smooth, but each nav-link still
+       *appears* the instant the growing edge clips past it — a hard binary
+       reveal, staircasing in one item at a time with no transition of its
+       own. Fading this whole wrapper in sync with the same open/close
+       toggle means items revealed early in the animation start dim/
+       transparent and continue brightening, instead of snapping straight
+       to fully opaque — softening the per-item "pop." */
+    opacity: 0;
+    transition: opacity 0.3s cubic-bezier(0, 1, 0.4, 1);
+}
+.eb-collapse.eb-collapse-open > div {
+    opacity: 1;
+}
+
+/* --- Sub-menu indentation guide line --- */
+/* The vendor's own .sidenav-menu-nested already draws a border-left guide
+   line (styles.css ~line 18596: border-left-width: thin, color #d4dae3 on
+   .sidenav-light) — that IS the reference screenshot's light-gray line.
+   At 1px it read as barely-there, so this keeps the vendor's own color
+   token (#d4dae3, not an invented shade — matches the theme's existing
+   design language rather than adding a new arbitrary color) and only
+   thickens it slightly to 2px so it stays visible without darkening it. */
+.sidenav-menu-nested {
+    border-left-width: 2px !important;
+    border-left-color: #d4dae3 !important;
+}
+.sidenav-menu-nested .nav-link {
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+}
+
+/* Sub-group headings (Manpower/Other Expenses/General Ledger) use
+   text-warning/text-success/text-danger directly in base.html — the same
+   three colors budget_list.html's category cards already cycle through
+   for C01/C02/C03 (warning, success, danger), so the sidebar groups read
+   as the same categories rather than introducing a new color language.
+   None of them are text-primary, which stays reserved for
+   .sidenav-light .sidenav-menu .nav-link.active (styles.css) — the "you
+   are here" highlight on an actual page link — so a heading is never
+   mistaken for the active page.
+*/
+
+/* --- Card hover treatment --- */
+/* Clickable cards (category cards): lift + shadow + pointer, as already
+   used on the budget_list.html category cards. */
+.card-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background-color 0.2s ease, border-color 0.2s ease;
+}
+.card-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    cursor: pointer;
+}
+
+/* Non-clickable content cards (table container, modal detail cards,
+   jspreadsheet wrapper cards): a subtle shadow-only cue, no lift/pointer,
+   since these aren't actionable the way category cards are. */
+.card-soft {
+    transition: box-shadow 0.2s ease-in-out, background-color 0.2s ease, border-color 0.2s ease;
+}
+.card-soft:hover {
+    box-shadow: 0 0.35rem 0.75rem rgba(0, 0, 0, 0.08) !important;
+}
+
+/* --- Entrance animations (reused across list/table/modal rendering) --- */
+@keyframes eb-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes eb-row-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes eb-flash {
+    0% { background-color: rgba(0, 97, 242, 0.12); }
+    100% { background-color: transparent; }
+}
+
+/* Table fade-in on category/filter change (budget_list.js renderDataTable) */
+.table-fade-in {
+    animation: eb-fade-in 0.35s ease both;
+}
+
+/* Staggered row entrance. Targets #tableContainer's table structurally
+   (NOT #tableBody by id) because simple-datatables rebuilds the tbody when
+   it initializes and drops the id (and any inline style) the row markup
+   originally had — a plain #tableBody selector or a JS-set inline
+   animation-delay would silently never apply. nth-child delays survive
+   that rebuild since row order is preserved. */
+#tableContainer table tbody tr {
+    animation: eb-row-in 0.3s ease both;
+}
+#tableContainer table tbody tr:nth-child(1) { animation-delay: 0ms; }
+#tableContainer table tbody tr:nth-child(2) { animation-delay: 25ms; }
+#tableContainer table tbody tr:nth-child(3) { animation-delay: 50ms; }
+#tableContainer table tbody tr:nth-child(4) { animation-delay: 75ms; }
+#tableContainer table tbody tr:nth-child(5) { animation-delay: 100ms; }
+#tableContainer table tbody tr:nth-child(6) { animation-delay: 125ms; }
+#tableContainer table tbody tr:nth-child(7) { animation-delay: 150ms; }
+#tableContainer table tbody tr:nth-child(8) { animation-delay: 175ms; }
+#tableContainer table tbody tr:nth-child(9) { animation-delay: 200ms; }
+#tableContainer table tbody tr:nth-child(n+10) { animation-delay: 225ms; }
+
+/* Modal body content fade-in once populated */
+.modal-content-fade-in {
+    animation: eb-fade-in 0.3s ease both;
+}
+
+/* Brief highlight flash when a spreadsheet enters/leaves edit mode */
+.eb-edit-flash {
+    animation: eb-flash 0.6s ease;
+}
+
+/* --- Cost Center dropdown (jSuites.dropdown), all Add Budget pages + the
+   two Budget List edit modals: one shared class set (.jdropdown-*), so one
+   override here covers every usage. jsuites.css's own hover/selected color
+   is #1f93ff, close to but not the theme's actual primary — swap it for
+   --bs-primary so the highlight matches the rest of the app's buttons/links
+   instead of an off-brand blue. The bordered "card" look came from
+   .jdropdown-content's shadow-less 1px border, which already reads close to
+   a native <select> listbox; this just aligns its border color with the
+   theme's own form-control border instead of jsuites' default. */
+.jdropdown-default .jdropdown-content {
+    border-color: var(--bs-border-color, #ced4da);
+}
+.jdropdown-default .jdropdown-item:hover,
+.jdropdown-default .jdropdown-selected {
+    background-color: var(--bs-primary);
+    color: #fff;
+}
+
+/* --- Dropdown indicator styling (Approach 1) ---
+   Gives both custom datalist dropdown cells (.eb-dropdown-cell) and
+   native jexcel dropdown cells (.jexcel_dropdown) a clean, modern SVG
+   chevron indicator pointing down on the right side of the cell.
+   Scoped to editable cells (:not(.readonly)) so read-only detail grids
+   remain clean text displays. */
+.jexcel > tbody > tr > td.eb-dropdown-cell:not(.readonly),
+.jexcel > tbody > tr > td.jexcel_dropdown:not(.readonly) {
+    background-repeat: no-repeat !important;
+    background-position: right 8px center !important;
+    background-size: 14px 14px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+    padding-right: 26px !important;
+    cursor: pointer;
+}
+
+.jexcel > tbody > tr > td.eb-dropdown-cell:not(.readonly):hover,
+.jexcel > tbody > tr > td.jexcel_dropdown:not(.readonly):hover {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230061f2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+}
+
+.jexcel > tbody > tr > td.readonly.eb-dropdown-cell,
+.jexcel > tbody > tr > td.readonly.jexcel_dropdown {
+    background-image: none !important;
+    cursor: default !important;
+}
+
+.eb-dropdown-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.eb-dropdown-input::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+/* --- Sticky Card Header on Add Budget pages ---
+   Sticks directly below the fixed topnav (.topnav height: 3.625rem / 58px)
+   so the Back, Add Row, and Save buttons remain accessible no matter how many
+   rows are added or how far down the user scrolls. */
+.eb-sticky-header {
+    position: sticky;
+    top: 3.625rem;
+    z-index: 1020;
+    background-color: var(--bs-card-bg, #ffffff) !important;
+    border-bottom: 1px solid var(--bs-card-border-color, rgba(33, 40, 50, 0.125));
+    box-shadow: 0 0.15rem 0.5rem rgba(33, 40, 50, 0.08);
+    border-radius: var(--bs-card-border-radius, 0.35rem) var(--bs-card-border-radius, 0.35rem) 0 0;
+}
+.theme-dark .eb-sticky-header {
+    background-color: #212832 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.125);
+    box-shadow: 0 0.15rem 0.5rem rgba(0, 0, 0, 0.3);
+}
+
+/* --- Cost Center / Configuration Selector Card & Dropdown z-index ---
+   Must float cleanly above .eb-sticky-header (z-index: 1020) so dropdown options
+   (e.g., Cost Center and Branch) are never covered or clipped by the table header below it.
+   Kept below .topnav (z-index: 1039) and #layoutSidenav_nav (z-index: 1038) so cards slide
+   underneath top navigation when scrolled down. */
+.eb-cost-center-card,
+.card:has(#cost-center-card-body),
+.card:has(#config-card-body) {
+    position: relative;
+    z-index: 1025;
+}
+
+#cost-center-card-body,
+#config-card-body {
+    overflow: visible !important;
+}
+
+#cost-center-card-body .ts-wrapper,
+#cost-center-card-body .ts-dropdown,
+#config-card-body .ts-wrapper,
+#config-card-body .ts-dropdown {
+    z-index: 1030 !important;
+}
+

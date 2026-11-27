@@ -1,43 +1,52 @@
-# เลือกใช้ Python 3.12 (แบบ Slim) เป็น Image หลัก เพื่อลดขนาดไฟล์
-FROM python:3.12-slim
+FROM dunglas/frankenphp:1-php8.3
 
-# ตั้งค่าตัวแปรสิ่งแวดล้อม (Environment Variables)
-# ป้องกันไม่ให้ Python เขียนไฟล์ .pyc (ไม่จำเป็นใน Docker)
-ENV PYTHONDONTWRITEBYTECODE=1
-# ให้ Python ส่ง Log ออกมาทันที ไม่ต้องรอ Buffer (ช่วยให้เห็น Log Real-time)
-ENV PYTHONUNBUFFERED=1
+ENV COMPOSER_ALLOW_SUPERUSER=1 \
+    ACCEPT_EULA=Y \
+    SERVER_NAME=":8000"
 
-# ติดตั้งโปรแกรมพื้นฐานที่จำเป็นสำหรับระบบ (curl, gnupg, certificates)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gnupg \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    install-php-extensions pdo_pgsql pgsql pdo_sqlsrv sqlsrv zip intl opcache
 
-# ดาวน์โหลด Key และเพิ่ม Repository ของ Microsoft สำหรับติดตั้ง Driver SQL Server ของ Debian 12
-RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
-    && echo "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# ติดตั้ง ODBC Driver 18 สำหรับ SQL Server และ Library สำหรับการพัฒนา (unixodbc-dev)
-# ACCEPT_EULA=Y คือการยอมรับเงื่อนไขการใช้งานของ Microsoft โดยอัตโนมัติ
-RUN apt-get update && ACCEPT_EULA=Y apt-get install -y --no-install-recommends \
-    unixodbc-dev \
-    msodbcsql18 \
-    && rm -rf /var/lib/apt/lists/*
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" \
+    && { \
+        echo 'memory_limit = 512M'; \
+        echo 'upload_max_filesize = 32M'; \
+        echo 'post_max_size = 32M'; \
+        echo 'max_execution_time = 120'; \
+        echo 'date.timezone = Asia/Bangkok'; \
+        echo 'opcache.enable = 1'; \
+        echo 'opcache.enable_cli = 1'; \
+        echo 'opcache.memory_consumption = 128'; \
+        echo 'opcache.interned_strings_buffer = 16'; \
+        echo 'opcache.max_accelerated_files = 20000'; \
+        echo 'opcache.validate_timestamps = 0'; \
+    } > "$PHP_INI_DIR/conf.d/99-queue.ini"
 
-# กำหนดโฟลเดอร์ทำงานภายใน Container เป็น /app
 WORKDIR /app
 
-# คัดลอกไฟล์ requirements.txt เข้าไปก่อน เพื่อติดตั้ง Library
-# (ทำแยกเพื่อใช้ประโยชน์จาก Docker Cache Layer หากไม่มีการแก้ไฟล์นี้)
-COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY Caddyfile /etc/caddy/Caddyfile
 
-# คัดลอกไฟล์โปรเจคทั้งหมดใน Folder ปัจจุบัน เข้าสู่ Container
-COPY . /app/
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
-# เปิด Port 5679 สำหรับการเชื่อมต่อ
-EXPOSE 5886
+COPY . .
 
-# คำสั่งเริ่มต้นเมื่อ Container ทำงาน (รัน Server Django)
-CMD ["python", "manage.py", "runserver", "0.0.0.0:5886"]
+RUN mkdir -p storage/app \
+             storage/framework/cache/data \
+             storage/framework/sessions \
+             storage/framework/views \
+             storage/logs \
+             bootstrap/cache \
+    && php artisan package:discover --ansi \
+    && sed -i 's/\r$//' docker-entrypoint.sh \
+    && chmod -R 775 storage bootstrap/cache \
+    && chmod +x docker-entrypoint.sh
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -f http://127.0.0.1:8000/up || exit 1
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
